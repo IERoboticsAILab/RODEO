@@ -1,0 +1,17 @@
+# goal
+string to              # destination address
+string amount          # IEC units, integer for now
+uint8  min_confirmations
+
+---
+# result
+bool   ok
+string tx_hash
+uint32 block_number
+
+---
+# feedback
+string state
+string tx_hash
+uint32 confirmations
+string error

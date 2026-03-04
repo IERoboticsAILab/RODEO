@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  oracle:
+    build:
+      context: ../..
+      dockerfile: oracle/docker/Dockerfile
+    container_name: rodeo-oracle
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      # Blockchain connection
+      - RPC_URL=${RPC_URL:-http://localhost:8545}
+      
+      # Smart Contract Addresses (loaded from .env)
+      - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
+      - TASK_MANAGER_ADDRESS=${TASK_MANAGER_ADDRESS}
+      - SERVICE_MANAGER_ADDRESS=${SERVICE_MANAGER_ADDRESS}
+      - IECOIN_ADDRESS=${IECOIN_ADDRESS}
+      
+      # Oracle Wallet (loaded from .env)
+      - ORACLE_ADDRESS=${ORACLE_ADDRESS}
+      - ORACLE_PRIVATE_KEY=${ORACLE_PRIVATE_KEY}
+      
+      # Configuration paths
+      - ADDRESSES_JSON=/workspace/addresses.json
+      - BASE_ABI=/workspace/abi
+      - TASK_MANAGER_NAME=TaskManager
+      
+      # Gas settings
+      - MIN_GAS_PRICE=1000000000
+      - GAS_MULTIPLIER=1.2
+      # - GAS_PRICE_OVERRIDE=2000000000
+      
+      # Validator settings
+      - PLAY_RATE=3.0
+      - MIN_STATE_SEC=0.5
+      - POS_EPS=0.002
+      
+      # Energy calculation
+      - IEC_PER_KWH=1.0
+      - IEC_DECIMALS=18
+      
+      # ROS settings
+      - ROS_MASTER_URI=http://localhost:11311
+      - ROS_IP=127.0.0.1
+      - ROS_HOSTNAME=localhost
+    volumes:
+      # Mount ABI files
+      - ../../dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
+      
+      # Mount proofs directory to same absolute path as host for consistent file:// URIs
+      - /home/lab/repos/robotic_decentralized_organization/oracle/proofs:/home/lab/repos/robotic_decentralized_organization/oracle/proofs:ro
+      
+      # Also mount to /workspace/proofs for convenience
+      - ../proofs:/workspace/proofs:ro
+
+      # Mount to /root/oracle/proofs — path used when robot_emulator runs inside Docker
+      # (script lives at /root/robot_emulator_ws/robot_emulator_demo.py → project_root=/root)
+      - ../proofs:/root/oracle/proofs:ro
+      
+      # Optional: Mount addresses file if you want to modify it
+      # - ../addresses.json:/workspace/addresses.json
+    stdin_open: true
+    tty: true
+    restart: unless-stopped

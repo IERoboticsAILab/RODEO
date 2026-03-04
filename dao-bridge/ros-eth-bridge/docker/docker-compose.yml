@@ -1,0 +1,41 @@
+services:
+  ros-eth-bridge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ros-eth-bridge
+    network_mode: host
+    environment:
+      # ROS Configuration
+      - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
+      - ROS_IP=${ROS_IP:-127.0.0.1}
+      - ROS_HOSTNAME=${ROS_HOSTNAME:-localhost}
+      
+      # Wallet Configuration
+      - ETH_WALLET_PASSPHRASE=${ETH_WALLET_PASSPHRASE:-}
+      
+      # Optional: Override config file location
+      - ROS_ETH_DAO_YAML=${ROS_ETH_DAO_YAML:-}
+    volumes:
+      # Mount configuration file
+      - ./configs/dao.yaml:/root/catkin_ws/src/ros_eth_bridge/config/dao.yaml:ro
+      
+      # Mount wallet keystore (must exist on host)
+      - ${WALLET_PATH:-~/.ros_eth/wallet.json}:/root/.ros_eth/wallet.json:ro
+      
+      # Optional: Mount ABIs from host (if different from container build)
+      - ${ABI_PATH:-../catkin_ws/src/ros_eth_bridge/abi}:/root/catkin_ws/src/ros_eth_bridge/abi:ro
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "bash", "-c", "source /opt/ros/noetic/setup.bash && rostopic list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  default:
+    name: rodeo-network
+    external: true

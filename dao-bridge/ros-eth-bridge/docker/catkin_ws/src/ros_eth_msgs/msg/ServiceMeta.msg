@@ -1,0 +1,7 @@
+uint64 id
+uint8[32] category_hash
+uint8[32] service_type_hash
+string price_wei
+string creator
+bool active
+bool busy

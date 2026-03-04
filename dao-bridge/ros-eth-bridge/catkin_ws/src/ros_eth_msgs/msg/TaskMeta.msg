@@ -1,0 +1,5 @@
+uint64 id
+uint8[32] category_hash
+uint8[32] task_type_hash
+bool active
+string reward_wei

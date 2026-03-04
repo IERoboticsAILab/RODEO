@@ -1,0 +1,14 @@
+{
+  "rpc_url": "http://10.205.10.9:8545",
+  "abi_root": "contracts",
+  "contracts": {
+    "Organization": "0xcEC91d876E8f003110D43381359b1bAd124e7F2b",
+    "IECoin": "0x0B306BF915C4d645ff596e518fAf3F9669b97016"
+  },
+  "wallets": {
+    "organization": {
+      "public": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "private": "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+    }
+  }
+}

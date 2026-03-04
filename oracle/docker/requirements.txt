@@ -1,0 +1,3 @@
+# Oracle Node Python Dependencies
+web3==6.11.3
+eth-account

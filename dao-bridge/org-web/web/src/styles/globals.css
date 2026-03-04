@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: 255 255 255;
+  --color-fg: 10 10 10;
+  --radius: 12px;
+}
+.dark {
+  --color-bg: 10 10 10;
+  --color-fg: 250 250 250;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: "liga" 1, "calt" 1;
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-fg));
+}
+
+.card {
+  @apply rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-neutral-900;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium tracking-[-0.01em] border border-gray-300 dark:border-gray-700 bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 transition;
+}
+.btn-primary {
+  @apply bg-brand text-black border-transparent hover:opacity-90;
+}
+.btn-ghost {
+  @apply bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-neutral-800;
+}
+
+.input {
+  @apply block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand;
+}
+
+.label {
+  @apply text-sm font-medium text-gray-700 dark:text-gray-300;
+}
+
+.table {
+  @apply w-full border-collapse;
+}
+.th, .td {
+  @apply border-b border-gray-200 dark:border-gray-800 text-left text-sm py-2 px-3;
+}
+.tr:hover {
+  @apply bg-gray-50 dark:bg-neutral-800;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-gray-300 dark:border-gray-700;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand;
+}

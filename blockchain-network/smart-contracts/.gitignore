@@ -1,0 +1,8 @@
+# dependencies
+node_modules/
+
+# hardhat build outputs
+cache/
+artifacts/
+
+

@@ -1,0 +1,30 @@
+{
+  "contracts": {
+    "IECoin":         "0xBA0304d46A84FD18F010C1c3805d88BD5A3f57d0",
+    "Organization":   "0x5De377212F2778A03EA908f5Fe8684A0b72dF07C",
+    "ServiceManager": "0xcF8CEb3E69fe71B96Cc82a12ca01A69E60B0111f",
+    "TaskManager":    "0x52f3142034cC9F2A60315Ecf2C1492DFb1eBB085"
+  },
+  "wallets": {
+    "deployer": {
+      "public":  "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "private": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    },
+    "organization": {
+      "public":  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "private": "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+    },
+     "oracle": {
+      "public":  "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "private": "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
+    },
+    "robot": {
+      "public":  "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "private": "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"
+    },
+    "human": {
+      "public":  "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "private": "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"
+    }
+  }
+}

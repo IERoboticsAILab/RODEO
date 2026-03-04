@@ -1,0 +1,16 @@
+# Goal
+uint64 task_id
+string proof_uri
+bool through_org
+uint32 min_confirmations
+---
+# Result
+bool ok
+string tx_hash
+uint32 block_number
+---
+# Feedback
+string state
+string tx_hash
+uint32 confirmations
+string error

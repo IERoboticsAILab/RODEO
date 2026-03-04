@@ -1,0 +1,17 @@
+# Goal
+string description
+string category
+string task_type
+string reward
+uint32 min_confirmations
+---
+# Result
+bool ok
+string tx_hash
+uint32 block_number
+---
+# Feedback
+string state
+string tx_hash
+uint32 confirmations
+string error

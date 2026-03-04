@@ -1,0 +1,215 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockOrganization",
+  "sourceName": "contracts/mocks/MockOrganization.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "serviceId",
+          "type": "uint256"
+        }
+      ],
+      "name": "OrgNotified",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "taskManagerAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "taskId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "executor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "reward",
+          "type": "uint256"
+        }
+      ],
+      "name": "callAssign",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "serviceManagerAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isBusy",
+          "type": "bool"
+        }
+      ],
+      "name": "callSetBusy",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "tm",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_oracle",
+          "type": "address"
+        }
+      ],
+      "name": "callSetOracle",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "taskManagerAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "taskId",
+          "type": "uint256"
+        }
+      ],
+      "name": "callUnassign",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "taskId",
+          "type": "uint256"
+        }
+      ],
+      "name": "checkTaskCancelation",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastServiceId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "serviceId",
+          "type": "uint256"
+        }
+      ],
+      "name": "onServiceRegistered",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "onServiceRemoved",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "onTaskComplete",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "onTaskRegistered",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registeredCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "removedCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60808060405234601557610469908161001b8239f35b600080fdfe608080604052600436101561001357600080fd5b6000803560e01c9182630943cc511461034457508163210ff9bb1461032857816323cf55c4146100a55781632a59c897146102c657816342b2459b1461028d578163496737e9146102205781634aeb1fc8146101dc57816383ffe980146101835781638db9cb87146101665781639ce729a314610149578163e7e86ae3146100aa575063ef46529a146100a557600080fd5b6103e8565b3461013757608036600319011261013757806100c46103cd565b6044356001600160a01b0381169190829003610145576001600160a01b031690813b15610145578291606483926040519485938492635a3889f360e11b845260243560048501526024840152833560448401525af1801561013a576101265750f35b81610130916103fb565b6101375780f35b80fd5b6040513d84823e3d90fd5b5050fd5b346101375780600319360112610137576020600154604051908152f35b346101375780600319360112610137576020600254604051908152f35b3461013757604036600319011261013757806001600160a01b036101a56103cd565b16803b156101d95781809160246040518094819363e6c2a66b60e01b8352833560048401525af1801561013a576101265750f35b50fd5b3461013757602036600319011261013757333b1561013757806040516301a9249d60e01b81526004356004820152818160248183335af1801561013a576101265750f35b34610137576060366003190112610137578061023a6103cd565b60443590811515809203610145576001600160a01b031690813b1561014557829160448392604051948593849263bb58ac2560e01b8452602435600485015260248401525af1801561013a576101265750f35b3461013757602036600319011261013757600154600181018091116102b25760015580f35b634e487b7160e01b82526011600452602482fd5b3461013757602036600319011261013757600435815460018101809111610314578255806002557f8817ff489eea52dc07822fff57755b61fea3d8ecb3c00da3dabf641f731061498280a280f35b634e487b7160e01b83526011600452602483fd5b3461013757806003193601126101375760209054604051908152f35b346103c95760403660031901126103c9578161035e6103cd565b6024356001600160a01b03811691908290036103c5576001600160a01b0316803b156103c5576024848481938195637adbf97360e01b845260048401525af180156103b8576103aa5780f35b6103b3916103fb565b818180f35b50604051903d90823e3d90fd5b8280fd5b5080fd5b600435906001600160a01b03821682036103e357565b600080fd5b346103e35760203660031901126103e357005b90601f8019910116810190811067ffffffffffffffff82111761041d57604052565b634e487b7160e01b600052604160045260246000fdfea26469706673582212203c3510a28a13d3b019bb6b2a7949a3d1e620f2022bd56a6baf993a8e6f447ea064736f6c634300081c0033",
+  "deployedBytecode": "0x608080604052600436101561001357600080fd5b6000803560e01c9182630943cc511461034457508163210ff9bb1461032857816323cf55c4146100a55781632a59c897146102c657816342b2459b1461028d578163496737e9146102205781634aeb1fc8146101dc57816383ffe980146101835781638db9cb87146101665781639ce729a314610149578163e7e86ae3146100aa575063ef46529a146100a557600080fd5b6103e8565b3461013757608036600319011261013757806100c46103cd565b6044356001600160a01b0381169190829003610145576001600160a01b031690813b15610145578291606483926040519485938492635a3889f360e11b845260243560048501526024840152833560448401525af1801561013a576101265750f35b81610130916103fb565b6101375780f35b80fd5b6040513d84823e3d90fd5b5050fd5b346101375780600319360112610137576020600154604051908152f35b346101375780600319360112610137576020600254604051908152f35b3461013757604036600319011261013757806001600160a01b036101a56103cd565b16803b156101d95781809160246040518094819363e6c2a66b60e01b8352833560048401525af1801561013a576101265750f35b50fd5b3461013757602036600319011261013757333b1561013757806040516301a9249d60e01b81526004356004820152818160248183335af1801561013a576101265750f35b34610137576060366003190112610137578061023a6103cd565b60443590811515809203610145576001600160a01b031690813b1561014557829160448392604051948593849263bb58ac2560e01b8452602435600485015260248401525af1801561013a576101265750f35b3461013757602036600319011261013757600154600181018091116102b25760015580f35b634e487b7160e01b82526011600452602482fd5b3461013757602036600319011261013757600435815460018101809111610314578255806002557f8817ff489eea52dc07822fff57755b61fea3d8ecb3c00da3dabf641f731061498280a280f35b634e487b7160e01b83526011600452602483fd5b3461013757806003193601126101375760209054604051908152f35b346103c95760403660031901126103c9578161035e6103cd565b6024356001600160a01b03811691908290036103c5576001600160a01b0316803b156103c5576024848481938195637adbf97360e01b845260048401525af180156103b8576103aa5780f35b6103b3916103fb565b818180f35b50604051903d90823e3d90fd5b8280fd5b5080fd5b600435906001600160a01b03821682036103e357565b600080fd5b346103e35760203660031901126103e357005b90601f8019910116810190811067ffffffffffffffff82111761041d57604052565b634e487b7160e01b600052604160045260246000fdfea26469706673582212203c3510a28a13d3b019bb6b2a7949a3d1e620f2022bd56a6baf993a8e6f447ea064736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

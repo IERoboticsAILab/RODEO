@@ -1,0 +1,16 @@
+<launch>
+  <rosparam file="$(find ros_eth_bridge)/config/dao.yaml" command="load" />
+
+  <!-- Read-only node: query services + event publishers -->
+  <node pkg="ros_eth_bridge" type="dao_listener_node.py" name="dao_listener"
+        output="screen">
+    <param name="poll_interval_sec" value="1.0" />
+    <param name="block_chunk"       value="1000" />
+  </node>
+
+  <!-- Write node: all action servers (tasks, services, tokens) -->
+  <node pkg="ros_eth_bridge" type="dao_writer_node.py" name="dao_writer"
+        output="screen">
+    <param name="wallet_passphrase" value="" />
+  </node>
+</launch>

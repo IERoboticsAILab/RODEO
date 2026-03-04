@@ -1,0 +1,5 @@
+string owner
+---
+bool ok
+string balance_wei
+uint8  decimals

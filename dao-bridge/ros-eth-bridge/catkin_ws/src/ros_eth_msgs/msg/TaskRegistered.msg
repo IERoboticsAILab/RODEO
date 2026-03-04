@@ -1,0 +1,3 @@
+uint32 task_id
+string creator
+uint32 block_number

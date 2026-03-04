@@ -1,0 +1,29 @@
+{
+  "name": "smart-contracts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "hardhat compile",
+    "deploy:ganache": "hardhat run --network ganache scripts/deploy.js",
+    "export-abis": "node scripts/export-abis.js",
+    "clean": "hardhat clean"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "1. add addresses in  hardhat.config.js for the deploy 2. in smart-contracts do:  npm init -y",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "dotenv": "^17.2.4",
+    "hardhat": "^2.28.6"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "type": "module"
+}

@@ -1,0 +1,9 @@
+services:
+  ganache:
+    build: .
+    container_name: ganache
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./ganache_db:/data
+    restart: unless-stopped

@@ -1,0 +1,20 @@
+services:
+  smart-contract-deployer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: smart-contract-deployer
+    volumes:
+      # Mount the entire smart-contracts directory
+      # This ensures artifacts, deployments, and cache are persisted to host
+      - ../artifacts:/app/artifacts
+      - ../deployments:/app/deployments
+      - ../cache:/app/cache
+      - ../.env:/app/.env:ro
+    environment:
+      # Connect to Ganache on host via special Docker hostname
+      # This works whether Ganache is in Docker or running directly on host
+      GANACHE_URL: http://host.docker.internal:8545
+    extra_hosts:
+      # Make host.docker.internal available (required on Linux)
+      - "host.docker.internal:host-gateway"

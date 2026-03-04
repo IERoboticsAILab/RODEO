@@ -1,0 +1,52 @@
+services:
+  org-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: org-web-console
+    ports:
+      - "${HOST_PORT:-8080}:80"
+    environment:
+      # Blockchain Configuration
+      - RPC_URL=${RPC_URL:-http://localhost:8545}
+      
+      # Contract Addresses
+      - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
+      - IECOIN_ADDRESS=${IECOIN_ADDRESS}
+      
+      # Organization Wallet (for signing transactions)
+      - ORGANIZATION_WALLET_PUBLIC=${ORGANIZATION_WALLET_PUBLIC}
+      - ORGANIZATION_WALLET_PRIVATE=${ORGANIZATION_WALLET_PRIVATE}
+      
+      # ABI Configuration
+      - ABI_ROOT=${ABI_ROOT:-contracts}
+      - ADDRESSES_JSON=${ADDRESSES_JSON:-addresses.json}
+      
+      # Frontend Configuration
+      - NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE:-http://localhost:8080}
+      
+      # CORS Configuration (optional, nginx handles same-origin)
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      
+      # Optional: IECoin deployment block (for optimization)
+      - IECOIN_DEPLOY_BLOCK=${IECOIN_DEPLOY_BLOCK:-0}
+    volumes:
+      # Mount contract ABIs (read-only)
+      - ./backend/contracts:/app/contracts:ro
+      
+      # Optional: Mount addresses.json if not using env vars
+      # - ./backend/addresses.json:/app/addresses.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - rodeo-network
+
+networks:
+  rodeo-network:
+    name: rodeo-network
+    driver: bridge

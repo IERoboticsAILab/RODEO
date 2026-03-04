@@ -1,0 +1,4 @@
+uint32 task_id
+---
+bool ok
+ros_eth_msgs/TaskInfo task

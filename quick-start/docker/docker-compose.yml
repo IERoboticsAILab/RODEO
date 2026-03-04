@@ -1,0 +1,19 @@
+services:
+  robot-emulator:
+    build:
+      context: ../..
+      dockerfile: quick-start/docker/Dockerfile
+    container_name: robot-emulator-demo
+    network_mode: host
+    environment:
+      - ROS_MASTER_URI=http://localhost:11311
+      - ROS_HOSTNAME=localhost
+    volumes:
+      # Mount proof files directory at expected path
+      - ../../oracle/proofs:/root/oracle/proofs:ro
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    # To skip service registration (for subsequent runs):
+    # Uncomment the line below:
+    # command: python3 /root/robot_emulator_ws/robot_emulator_demo.py --skip-registration

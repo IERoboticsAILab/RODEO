@@ -1,0 +1,14 @@
+# Goal
+uint64 service_id
+uint32 min_confirmations
+---
+# Result
+bool ok
+string tx_hash
+uint32 block_number
+---
+# Feedback
+string state
+string tx_hash
+uint32 confirmations
+string error

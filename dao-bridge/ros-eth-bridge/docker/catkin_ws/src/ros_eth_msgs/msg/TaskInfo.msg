@@ -1,0 +1,11 @@
+uint32 id
+string description
+string category
+string task_type
+string creator
+string executor
+string reward_wei
+uint8  status
+bool   active
+string proof_uri
+bool   verified

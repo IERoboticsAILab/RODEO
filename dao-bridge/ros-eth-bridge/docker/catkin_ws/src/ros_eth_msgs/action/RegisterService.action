@@ -1,0 +1,19 @@
+# Goal
+string name
+string description
+string category
+string service_type
+string price
+uint8 provider_type
+uint32 min_confirmations
+---
+# Result
+bool ok
+string tx_hash
+uint32 block_number
+---
+# Feedback
+string state
+string tx_hash
+uint32 confirmations
+string error

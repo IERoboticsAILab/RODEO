@@ -1,0 +1,10 @@
+uint32 id
+string name
+string description
+string category
+string service_type
+string price_wei
+string creator
+bool   active
+uint8  provider_type
+bool   busy

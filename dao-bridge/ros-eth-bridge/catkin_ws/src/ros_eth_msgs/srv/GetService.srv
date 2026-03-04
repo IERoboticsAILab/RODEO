@@ -1,0 +1,4 @@
+uint32 service_id
+---
+bool ok
+ros_eth_msgs/ServiceInfo service
