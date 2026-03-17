@@ -2,21 +2,18 @@
 RODEO: Robotic Decentralized Organization
 </h1>
 
-<p align="center">
-🏅 ICRA 2026  
-</p>
-
 <!--
 <p align="center">
 <a href="PROJECT_PAGE">
 <img src="https://img.shields.io/badge/Homepage-blue?style=for-the-badge&logo=google-chrome&logoColor=white">
 </a>
+-->
 
-<a href="ARXIV_LINK">
+<a href="https://arxiv.org/abs/2603.06058">
 <img src="https://img.shields.io/badge/arXiv-Paper-red?style=for-the-badge&logo=arxiv&logoColor=white">
 </a>
 
-<a href="YOUTUBE_LINK">
+<a href="https://youtu.be/L5voOWKFLzk?si=cIMpkU0fx8_hpq45">
 <img src="https://img.shields.io/badge/YouTube-Video-red?style=for-the-badge&logo=youtube&logoColor=white">
 </a>
 
@@ -25,7 +22,7 @@ RODEO: Robotic Decentralized Organization
 </a>
 </p>
 
--->
+
 
 <p align="center">
 <img src="assets/demo.gif" width="800">
