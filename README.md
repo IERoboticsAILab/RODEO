@@ -14,11 +14,11 @@ RODEO: Robotic Decentralized Organization
 </a>
 
 <a href="https://youtu.be/L5voOWKFLzk?si=cIMpkU0fx8_hpq45">
-<img src="https://img.shields.io/badge/YouTube-Video-red?style=for-the-badge&logo=youtube&logoColor=white">
+<img src="https://img.shields.io/badge/Demo-Video-cc0000?style=flat&logo=youtube&logoColor=white">
 </a>
 
 <a href="LICENSE_LINK">
-<img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge">
+<img src="https://img.shields.io/badge/License-MIT-black?style=flat-square">
 </a>
 </p>
 
