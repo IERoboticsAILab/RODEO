@@ -366,7 +366,7 @@ If you use RODEO in your research, please cite:
 -->
 ## License
 
-[Specify License - e.g., MIT, Apache 2.0, GPL-3.0]
+MIT License
 
 ## Contributing
 
