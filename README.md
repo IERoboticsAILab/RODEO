@@ -3,12 +3,12 @@ RODEO: Robotic Decentralized Organization
 </h1>
 
 <!--
-<p align="center">
+
 <a href="PROJECT_PAGE">
 <img src="https://img.shields.io/badge/Homepage-blue?style=for-the-badge&logo=google-chrome&logoColor=white">
 </a>
 -->
-
+<p align="center">
 <a href="https://arxiv.org/abs/2603.06058">
 <img src="https://img.shields.io/badge/arXiv-Paper-red?style=for-the-badge&logo=arxiv&logoColor=white">
 </a>
