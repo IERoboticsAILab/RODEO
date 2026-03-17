@@ -17,7 +17,7 @@ RODEO: Robotic Decentralized Organization
 <img src="https://img.shields.io/badge/Demo-Video-cc0000?style=flat&logo=youtube&logoColor=white">
 </a>
 
-<a href="LICENSE_LINK">
+<a href="./LICENSE.md">
 <img src="https://img.shields.io/badge/Code%20License-MIT-6a994e?style=flat">
 </a>
 </p>
