@@ -10,7 +10,7 @@ RODEO: Robotic Decentralized Organization
 -->
 <p align="center">
 <a href="https://arxiv.org/abs/2603.06058">
-<img src="https://img.shields.io/badge/arXiv-Paper-red?style=for-the-badge&logo=arxiv&logoColor=white">
+<img src="https://img.shields.io/badge/arXiv-2603.06058-b31b1b?style=flat-square&logo=arxiv&logoColor=white">
 </a>
 
 <a href="https://youtu.be/L5voOWKFLzk?si=cIMpkU0fx8_hpq45">
