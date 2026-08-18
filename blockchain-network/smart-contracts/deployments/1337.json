@@ -1,19 +1,19 @@
 {
   "chainId": 1337,
   "network": "ganache",
-  "timestamp": "2026-03-04T12:12:34.572Z",
+  "timestamp": "2026-08-18T10:15:34.198Z",
   "contracts": {
     "IECoin": {
-      "address": "0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575"
+      "address": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0"
     },
     "Organization": {
-      "address": "0x4060eF0D5a7F0633c5927F7E05041dd7Fcd95f42"
+      "address": "0x715214AeEf7D4C78b9c329cc4D7375cC08670843"
     },
     "ServiceManager": {
-      "address": "0xD7a385546a6a2355C6a1DfAdf33b55c43e2C19B0"
+      "address": "0x32Ed2BD67238Be274E127096F42f0a4061aC0Bff"
     },
     "TaskManager": {
-      "address": "0x15E1268353F6F19D9de2722bD60eC1081b45D3a6"
+      "address": "0x07dEF209701605580893ecd7C3cE2340f5b16875"
     }
   }
 }
