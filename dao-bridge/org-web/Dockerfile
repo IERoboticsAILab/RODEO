@@ -4,6 +4,8 @@ WORKDIR /frontend
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ .
+ARG NEXT_PUBLIC_API_BASE=/api
+ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 RUN npm run build
 
 # runtime with node + python + nginx + supervisor

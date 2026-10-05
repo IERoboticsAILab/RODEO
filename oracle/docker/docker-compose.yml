@@ -50,9 +50,6 @@ services:
       # Mount ABI files
       - ../../dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
       
-      # Mount proofs directory to same absolute path as host for consistent file:// URIs
-      - /home/lab/repos/robotic_decentralized_organization/oracle/proofs:/home/lab/repos/robotic_decentralized_organization/oracle/proofs:ro
-      
       # Also mount to /workspace/proofs for convenience
       - ../proofs:/workspace/proofs:ro
 

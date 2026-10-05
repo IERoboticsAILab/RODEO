@@ -1,5 +1,5 @@
 import { formatUnitsString  } from "./units";
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://10.205.10.9:8080"
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api"
 
 
 async function j<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
