@@ -2,12 +2,12 @@
 RODEO: Robotic Decentralized Organization
 </h1>
 
-<!--
 
-<a href="PROJECT_PAGE">
+
+<a href="https://rodeo.cyphy.life/">
 <img src="https://img.shields.io/badge/Homepage-blue?style=for-the-badge&logo=google-chrome&logoColor=white">
 </a>
--->
+
 <p align="center">
 <a href="https://arxiv.org/abs/2603.06058">
 <img src="https://img.shields.io/badge/Paper-arXiv%202603.06058-8b1e3f?style=flat&logo=arxiv&logoColor=white">
@@ -349,21 +349,25 @@ docker logs -f rodeo-oracle
 - **Network**: Stable internet connection for Docker image downloads
 
 
-<!--
+
 ## Citation
 
 If you use RODEO in your research, please cite:
 
 ```bibtex
-@article{rodeo2026,
-  title={RODEO: A Blockchain-Based Framework for Decentralized Robot Coordination},
-  author={[Your Name]},
-  journal={[Journal Name]},
+@INPROCEEDINGS{11696135,
+  author={Groshev, Milan and Ferrer, Eduardo Castelló},
+  booktitle={2026 IEEE International Conference on Robotics and Automation (ICRA)},
+  title={RODEO: RObotic DEcentralized Organization},
   year={2026},
-  note={Scientific artifact available at: [Repository URL]}
+  volume={},
+  number={},
+  pages={9639-9646},
+  keywords={Robots;Organizations;Printing;Decentralized autonomous organization;Timing;Cleaning;IEC;Service robots;Batteries;Bridges},
+  doi={10.1109/ICRA57385.2026.11696135}}
 }
 ```
--->
+
 ## License
 
 MIT License
