@@ -4,19 +4,24 @@ RODEO: Robotic Decentralized Organization
 
 
 
+
+
 <p align="center">
-  <a href="https://rodeo.cyphy.life/">
-    <img src="https://img.shields.io/badge/Homepage-blue?style=flat&logo=google-chrome&logoColor=white" alt="Homepage">
-  </a>
-  <a href="https://arxiv.org/abs/2603.06058">
-    <img src="https://img.shields.io/badge/Paper-arXiv%202603.06058-8b1e3f?style=flat&logo=arxiv&logoColor=white" alt="Paper">
-  </a>
-  <a href="https://youtu.be/L5voOWKFLzk?si=cIMpkU0fx8_hpq45">
-    <img src="https://img.shields.io/badge/Demo-Video-cc0000?style=flat&logo=youtube&logoColor=white" alt="Demo video">
-  </a>
-  <a href="./LICENSE.md">
-    <img src="https://img.shields.io/badge/Code%20License-MIT-6a994e?style=flat" alt="MIT license">
-  </a>
+<a href="https://rodeo.cyphy.life/">
+<img src="https://img.shields.io/badge/Homepage-blue?style=flat&logo=google-chrome&logoColor=white">
+</a>
+
+<a href="https://arxiv.org/abs/2603.06058">
+<img src="https://img.shields.io/badge/Paper-arXiv%202603.06058-8b1e3f?style=flat&logo=arxiv&logoColor=white">
+</a>
+
+<a href="https://youtu.be/L5voOWKFLzk?si=cIMpkU0fx8_hpq45">
+<img src="https://img.shields.io/badge/Demo-Video-cc0000?style=flat&logo=youtube&logoColor=white">
+</a>
+
+<a href="./LICENSE.md">
+<img src="https://img.shields.io/badge/Code%20License-MIT-6a994e?style=flat">
+</a>
 </p>
 
 
