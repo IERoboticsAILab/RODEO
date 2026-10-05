@@ -8,7 +8,7 @@ RODEO: Robotic Decentralized Organization
 
 <p align="center">
 <a href="https://rodeo.cyphy.life/">
-<img src="https://img.shields.io/badge/Web20Page-blue?style=flat&logo=google-chrome&logoColor=white">
+<img src="https://img.shields.io/badge/Web%20Page-blue?style=flat&logo=google-chrome&logoColor=white">
 </a>
 
 <a href="https://arxiv.org/abs/2603.06058">
