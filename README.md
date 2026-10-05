@@ -4,11 +4,13 @@ RODEO: Robotic Decentralized Organization
 
 
 
+
+
+<p align="center">
 <a href="https://rodeo.cyphy.life/">
 <img src="https://img.shields.io/badge/Homepage-blue?style=for-the-badge&logo=google-chrome&logoColor=white">
 </a>
 
-<p align="center">
 <a href="https://arxiv.org/abs/2603.06058">
 <img src="https://img.shields.io/badge/Paper-arXiv%202603.06058-8b1e3f?style=flat&logo=arxiv&logoColor=white">
 </a>
