@@ -4,7 +4,7 @@ This directory contains the Docker configuration for running the RODEO Oracle No
 
 ## Overview
 
-The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. It runs in a ROS Noetic environment to support .bag file validation.
+The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. It is plain Python (no ROS): proofs, including legacy ROS 1 .bag files, are read with the `rosbags` library.
 
 ## Prerequisites
 

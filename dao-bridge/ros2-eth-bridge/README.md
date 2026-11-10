@@ -100,10 +100,8 @@ ros2 launch ros_eth_bridge ros_eth_gateway.launch.py \
   and works; a modern pip refuses the pair, so eth-account is installed with
   `--no-deps`. Moving to web3 7 would remove this, but needs the `eth/` layer
   checked against web3 7 first.
-* **Oracle.** The oracle still validates ROS 1 bags with `rosbag play`, which
-  needs a ROS 1 master. The ROS 1 bridge used to start one; the oracle's
-  entrypoint now starts its own when none is running. The oracle also reads
-  its contract ABIs from this package's `abi/` folder.
+* **Oracle.** The oracle reads its contract ABIs from this package's `abi/`
+  folder.
 * **DDS between containers.** Both compose files use `network_mode: host` and
   `ipc: host`, which ROS 2's shared-memory transport needs across containers.
 * **Addresses.** `scripts/update-addresses.sh` updates `docker/configs/dao.yaml`

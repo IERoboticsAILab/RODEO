@@ -63,16 +63,17 @@ first, so no new task is assigned while it is down.
 |---|---|---|
 | `ROS_DOMAIN_ID` | 40 | must match the bridge |
 | `ROBOT_NAMESPACE` | none | must match the bridge, e.g. `panther` |
-| `PROOF_MODE` | `legacy` | see below |
+| `PROOF_MODE` | `rodeo` | see below |
 | `SERVICES_FILE` | the Panther's `services.yaml` | any robot's `services.yaml` |
 
 Set them in the shell or in `quick-start/docker/.env`.
 
-**Proof mode.** Today's oracle can only validate the ROS 1 bag from the
-original waste-sorting demo. In `legacy` mode the fake executor still writes
-the RODEO proof (to `oracle/proofs/task<id>_<robot>_<time>/`), but hands the
-agent that sample bag to submit, so the current oracle approves the task. Once
-the oracle validates RODEO proofs, set `PROOF_MODE=rodeo`.
+**Proof mode.** In `rodeo` mode the agent submits the RODEO proof the fake
+executor writes to `oracle/proofs/task<id>_<robot>_<time>/`, and the oracle
+runs its shared checks and the delivery validator on it. `legacy` mode submits
+the ROS 1 bag from the original waste-sorting demo instead; the oracle accepts
+it only while `LEGACY_PROOFS=1`, and since that bag is not bound to a task it
+passes for any task.
 
 ## Inspect a proof
 

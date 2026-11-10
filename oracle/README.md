@@ -6,31 +6,54 @@ The Oracle Node is a trusted verification service that validates task completion
 
 The Oracle serves as an independent verification layer in the RODEO system:
 
-1. **Listens for Proof Submissions** - Monitors blockchain events when robots submit task completion proofs
-2. **Validates Proofs** - Analyzes proof data to verify task completion:
-   - **ROS bag files (.bag)**: Validates robot motion, arm movements, and disposal events
-   - **Power consumption logs (.csv)**: Calculates energy usage and converts to IECoin rewards
-3. **Makes Decisions** - Approves valid proofs or rejects invalid ones with specific reasons
-4. **Updates Blockchain** - Sends verification transactions to the TaskManager contract
-5. **Triggers Payments** - Approved tasks automatically release escrowed funds to robots
+1. **Listens for Proof Submissions** - Monitors `TaskOracleRequested` events when robots submit proofs
+2. **Validates Proofs** - Runs shared checks, then the validator registered for the task's service
+3. **Makes Decisions** - Approves valid proofs or rejects invalid ones with a specific reason
+4. **Updates Blockchain** - Sends `oracleFulfill` to the TaskManager contract
+5. **Triggers Payments** - Approved tasks release the escrowed reward to the robot
 
-### Current Validation Capabilities
+It is plain Python: proofs are read with the `rosbags` library, so neither ROS 1
+nor ROS 2 is installed and no bag is replayed.
 
-#### ROS Bag Validation
-The oracle analyzes robot behavior from ROS bag recordings:
-- **Base Movement**: Tracks odometry to verify robot traveled minimum distance
-- **Arm Manipulation**: Monitors joint states for arm activity
-- **Disposal Events**: Confirms task-specific events (e.g., waste disposal)
-- **Motion Analysis**: Detects movement vs. stopped states to prevent false proofs
+### Checks on every RODEO proof
 
-#### Power Consumption Validation
-For energy-based tasks:
-- Parses CSV power logs with timestamps and wattage
-- Calculates total energy consumption (kWh)
-- Converts energy to IECoin rewards based on configured rate
-- Awards tokens proportional to energy used
+A RODEO proof (a ROS 2 bag written by the robot's executor, see
+[../robot-agent/README.md](../robot-agent/README.md)) must pass these before its
+service's validator runs:
 
----
+| Check | Rejects |
+|---|---|
+| Hash | a file that no longer matches the `#sha256=` in its URI |
+| Reuse | a proof already used for another task (hashes are kept in `state/used_proofs.json`) |
+| Manifest | a proof for another task, executor, category or task type |
+| Parameters | a proof whose parameters differ from the task's (with the service's defaults filled in) |
+| Time window | messages recorded before the task's assignment or after the proof's submission (block times, `CLOCK_TOLERANCE_SEC`) |
+
+### Validators
+
+Chosen by the task's category and task type (`oracle_node/validators/`):
+
+| Service | Validator | Checks |
+|---|---|---|
+| Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`, declared weight if given); receipt confirmed at drop-off by the named recipient |
+
+A new service gets a validator by adding a module with
+`@register("Category", "TaskType")` and importing it in
+`validators/__init__.py`. A RODEO proof for a service without a validator is
+rejected.
+
+### Legacy proofs
+
+Proofs in the original formats are still accepted while `LEGACY_PROOFS=1` (the
+default):
+
+- **ROS 1 bag (.bag)**: the original waste-sorting checks (path length on
+  `/odom_mocap`, arm movement on `/vx300s/joint_states`, a correct
+  `/disposal_event`), ported to read the bag directly.
+- **Power log (.csv)**: energy is computed and the task approved, as before.
+
+They carry no manifest, so a legacy proof passes for **any** task. Set
+`LEGACY_PROOFS=0` to refuse them once nothing relies on them.
 
 ## Quick Start (Docker)
 
@@ -130,22 +153,30 @@ rodeo-oracle  | [li] list inbox, [ok] approve, [no] reject, [va] validate, [q] q
 
 ### Proof Format
 
-**ROS Bag Files:**
+**RODEO proofs** (ROS 2 bag directory, MCAP storage):
 ```
-Proof URI: file:///path/to/task_tid1_20250904_164349.bag
+Proof URI: file:///root/oracle/proofs/task12_panther_20261110T142233#sha256=<hex>
+Topics:
+  - /rodeo/manifest        (rodeo_interfaces/ProofManifest)  task, executor, parameters
+  - /rodeo/pose            (geometry_msgs/PoseStamped)       map frame
+  - /rodeo/events          (rodeo_interfaces/TaskEvent)      arrive, depart, say, confirm
+  - /rodeo/payload_weight  (rodeo_interfaces/PayloadWeight)  delivery only
+```
+
+**Legacy ROS 1 bags:**
+```
+Proof URI: file:///root/oracle/proofs/task_tid10_20250910_145742.bag
 Topics:
   - /odom_mocap (nav_msgs/Odometry)
   - /vx300s/joint_states (sensor_msgs/JointState)
   - /disposal_event (std_msgs/String)
 ```
 
-note: In the proofs directory there are two  examplaary proofs rosbags from task 1 (task_tid1_20250904_164349.bag) and task 10 (task_tid10_20250910_145742.bag).
+The proofs directory holds two example legacy bags: `task_tid10_20250910_145742.bag`
+passes the waste-sorting checks, `task_tid1_20250904_164349.bag` fails them (no
+correct disposal event).
 
-❌ Task 1 is a failed task and will result in escrowed funds returend to creater.
-
-✅ Task 2 is sucsesfull task and will result in escrowed funds relested to robot.
-
-**Power CSV Files:**
+**Legacy power CSV files:**
 ```
 Proof URI: file:///path/to/power_log.csv
 Format:
@@ -219,23 +250,23 @@ python -m oracle_node.main
 
 ```
 oracle/
-├── docker/                    # Docker deployment
-│   ├── Dockerfile             # Container definition
-│   ├── docker-compose.yml     # Orchestration
+├── docker/                    # Docker deployment (python:3.11-slim, no ROS)
+│   ├── Dockerfile
+│   ├── docker-compose.yml
 │   ├── .env.example           # Configuration template
-│   ├── oracle-docker.sh       # Helper script
-│   ├── QUICKSTART.md          # Quick start guide
-│   └── README.md              # Docker documentation
+│   └── oracle-docker.sh       # Helper script
 ├── oracle_node/               # Oracle Python package
 │   ├── main.py                # Entry point
-│   ├── controller.py          # Validation logic
+│   ├── settings.py            # Configuration from the environment
+│   ├── chain.py               # Contract access, task time windows, service descriptions
 │   ├── events.py              # Event monitoring
-│   ├── task_manager.py        # Contract interaction
-│   └── validator/             # Validation modules
-├── proofs/                    # Proof file storage
-│   └── README.md              # Proof examples
-├── oracle_rosbag_validator.py # ROS bag validator
-├── power_logger.py            # Power monitoring utility
+│   ├── controller.py          # Routes each proof to its checks
+│   ├── proofs.py              # Reads proofs (rosbags)
+│   ├── checks.py              # Shared checks on RODEO proofs
+│   ├── power_csv.py           # Energy from power CSVs
+│   └── validators/            # delivery.py, waste_ros1.py, energy_csv.py
+├── proofs/                    # Proofs (examples committed; generated ones ignored)
+├── state/                     # Hashes of used proofs (created at run time, not committed)
 └── addresses.json             # Contract addresses (fallback)
 ```
 

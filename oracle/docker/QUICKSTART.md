@@ -56,7 +56,7 @@ Or manually:
 docker-compose build
 ```
 
-**Build time**: ~5-10 minutes (downloads ROS Noetic base image)
+**Build time**: about a minute
 
 ### Step 2: Start the Oracle
 
@@ -190,10 +190,7 @@ docker logs rodeo-oracle
 
 **Common issues:**
 
-1. **Port conflict**: Another service using port 11311 (ROS)
-   - Solution: Stop other ROS instances or change `ROS_MASTER_URI`
-
-2. **Missing ABI files**:
+1. **Missing ABI files**:
    ```
    Could not start watcher
    ```

@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: rodeo_common
+Version: 0.1.0
+Summary: RODEO robot standard as plain Python
+Maintainer: Tersoo Samuel Awai
+Maintainer-email: samuel.awai5@gmail.com
+License: MIT
+Requires-Dist: setuptools
+Requires-Dist: pyyaml
+Dynamic: license
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary

@@ -21,3 +21,6 @@ dao-bridge/ros2-eth-bridge/docker/.env
 
 # proofs written by executors (task<id>_<robot>_<time>/)
 oracle/proofs/task[0-9]*_*/
+
+# oracle state (hashes of used proofs)
+oracle/state/

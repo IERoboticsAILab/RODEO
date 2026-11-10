@@ -1,42 +1,23 @@
-FROM osrf/ros:noetic-desktop-full
+# RODEO oracle v2: plain Python. Proofs are read with `rosbags`, so neither ROS 1
+# nor ROS 2 is installed. Build context: repo root.
+FROM python:3.11-slim
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
-ENV ROS_DISTRO=noetic
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Install Python dependencies
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-rospy \
-    python3-rosbag \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy and install Python packages
 COPY oracle/docker/requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt && \
+    pip install --no-deps eth-account==0.13.7 && \
+    pip install "setuptools<70"            # web3 6.x imports pkg_resources
 
-# Create workspace
+# Shared RODEO conventions (task descriptions, service schema, proof URIs)
+COPY robot-agent/ros2_ws/src/rodeo_common /tmp/rodeo_common
+RUN pip install --no-deps /tmp/rodeo_common && rm -rf /tmp/rodeo_common
+
 WORKDIR /workspace
-
-# Copy oracle code
 COPY oracle/oracle_node/ /workspace/oracle_node/
 COPY oracle/addresses.json /workspace/addresses.json
+RUN mkdir -p /workspace/abi /workspace/state
 
-# Copy ABI files from build context
-# These will be mapped or copied during build
-RUN mkdir -p /workspace/abi
-
-# Source ROS setup in bashrc for interactive shells
-RUN echo "source /opt/ros/noetic/setup.bash" >> /root/.bashrc
-
-# Set environment variables for the oracle
-ENV ROS_SETUP=/opt/ros/noetic/setup.bash
-ENV ROS_DISTRO=noetic
-ENV PYTHONPATH=/workspace:${PYTHONPATH}
-
-# Create entrypoint script
-COPY oracle/docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+ENV PYTHONPATH=/workspace
 CMD ["python3", "-m", "oracle_node.main"]

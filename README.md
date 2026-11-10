@@ -290,22 +290,22 @@ Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
    2.2 After creating the task you will notice that it has been assigned to the robot wallet.
 3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload, recipient confirmation.
 4. The agent hashes the proof and submits it.
-5. On the oracle terminal you can see the new proof being validated. This can take some time since the oracle replays the rosbag and validates different steps. In the end you will see:
+5. On the oracle terminal you can see the new proof being validated: first the checks every proof must pass (hash, reuse, manifest, parameters, time window), then the delivery validator. In the end you will see:
 ```
 rodeo-oracle  | Validation summary
-rodeo-oracle  |   Base path: OK  total 10.956 m, min 0.100 m
-rodeo-oracle  |   Arm: OK  net delta 13.4467 rad, tol 0.0500 rad, moves 952
-rodeo-oracle  |   Arm top joints by change: shoulder:3.069, wrist_rotate:3.037, forearm_roll:3.036
-rodeo-oracle  |   Disposal event: OK  correct flag seen True
+rodeo-oracle  |   OK    proof hash matches the URI
+rodeo-oracle  |   OK    proof not used before
+rodeo-oracle  |   OK    manifest task id 1
+rodeo-oracle  |   OK    parameters match the task
+rodeo-oracle  |   OK    recorded +1.2 s .. +0.2 s relative to assignment/submission (tolerance 5 s)
+rodeo-oracle  |   OK    pose at pick-up arrival 0.00 m from 'package_pickup' (max 1.00 m)
+rodeo-oracle  |   OK    package loaded at pick-up: 1.200 kg (min 0.05)
+rodeo-oracle  |   OK    deck empty after drop-off: 0.000 kg
+rodeo-oracle  |   OK    receipt confirmed at 'package_dropoff' by 'the recipient'
 rodeo-oracle  | APPROVED
-rodeo-oracle  |
-rodeo-oracle  | ----- validator output end -----
-rodeo-oracle  |
 rodeo-oracle  | Approved task 1
-rodeo-oracle  |
 rodeo-oracle  | Task 1 verified
 ```
-   (Until the oracle validates RODEO proofs, the demo submits the original waste-sorting bag; see `PROOF_MODE` in the quick-start README.)
 6. Next check the web console: in the home tab you can see that the payment is released to the robot.
 
 **Expected output** (abridged):

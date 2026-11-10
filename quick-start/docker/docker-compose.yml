@@ -32,8 +32,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
-      # legacy: also returns the ROS 1 waste-demo bag, which is the only proof
-      # today's oracle can validate. Switch to rodeo once the oracle reads
-      # RODEO proofs.
-      - PROOF_MODE=${PROOF_MODE:-legacy}
+      # rodeo: submit the RODEO proof it writes (default)
+      # legacy: submit the original ROS 1 waste-demo bag instead (needs LEGACY_PROOFS=1 on the oracle)
+      - PROOF_MODE=${PROOF_MODE:-rodeo}
     restart: unless-stopped
