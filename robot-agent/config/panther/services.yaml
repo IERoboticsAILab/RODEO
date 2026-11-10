@@ -1,0 +1,36 @@
+# What the Panther offers to RODEO. Read by the Panther's agent (registration,
+# task parameters) and executor (place -> waypoint). See rodeo_common/services_config.py.
+robot: panther
+wallet: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"   # Ganache robot account; replace on a real network
+
+services:
+  - name: Delivery
+    category: Logistics
+    task_type: ItemTransport
+    price_iec: 100
+    summary: Picks up a package at one place and delivers it to another; the recipient confirms receipt
+    params:
+      pickup:    {type: place,  label: Pick-up place}
+      dropoff:   {type: place,  label: Deliver to}
+      sender:    {type: text,   label: From}
+      recipient: {type: text,   label: Recipient (confirms receipt)}
+      declared_weight_kg: {type: number, label: Package weight (kg), optional: true}
+    settings:
+      wait_s: 60            # how long to wait at pick-up and drop-off
+
+# The places the web app's client page offers (webapp.py CLIENT_PLACES and LABELS).
+# xy: map-frame position the oracle checks poses against. Copy it from
+# waypoints_captured.yaml (the pose of that waypoint); null until then.
+places:
+  farah_desk:      {label: "Farah's desk",         waypoint: M,  xy: null}
+  saleh_desk:      {label: "Saleh's desk",         waypoint: N,  xy: null}
+  rodrigo_desk:    {label: "Rodrigo's desk",       waypoint: O,  xy: null}
+  samuel_desk:     {label: "Samuel's desk",        waypoint: P,  xy: null}
+  ee_server_room:  {label: "EE room / Server room", waypoint: G,  xy: null}
+  package_pickup:  {label: "Package pick up",      waypoint: H,  xy: null}
+  package_dropoff: {label: "Package drop off",     waypoint: K,  xy: null}
+  mech_room:       {label: "Mech room",            waypoint: C1, xy: null}
+  office:          {label: "Office",               waypoint: E1, xy: null}
+
+charging:
+  max_price_iec: 20         # the most the agent pays for one charging session

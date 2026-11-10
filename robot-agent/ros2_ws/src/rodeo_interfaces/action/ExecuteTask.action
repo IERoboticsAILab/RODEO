@@ -1,0 +1,21 @@
+# Run one RODEO task on a robot. Served by the robot's executor at
+# /<robot>/rodeo/execute_task; called by that robot's agent.
+#
+# Goal
+uint64 task_id
+string category
+string task_type
+string params_json      # task parameters as a JSON object ("{}" for fixed services)
+string note             # free text the task creator wrote
+string executor         # this robot's wallet address (written into the proof manifest)
+string robot            # robot name from services.yaml
+string proof_dir        # directory the executor writes the proof bag into
+---
+# Result
+bool   success
+string proof_path       # absolute path of the closed proof bag ("" when success is false)
+string message
+---
+# Feedback
+string stage            # e.g. to_pickup, waiting_pickup, to_dropoff, waiting_confirm
+string detail
