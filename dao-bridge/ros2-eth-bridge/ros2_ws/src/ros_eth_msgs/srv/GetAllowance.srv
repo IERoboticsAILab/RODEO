@@ -1,0 +1,5 @@
+string owner
+string spender
+---
+bool ok
+string allowance_wei

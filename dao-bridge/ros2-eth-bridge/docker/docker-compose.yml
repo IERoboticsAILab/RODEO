@@ -1,0 +1,22 @@
+# ROS 2 Humble version of the RODEO ROS-Ethereum bridge (one wallet per instance).
+name: rodeo-ros2-bridge
+
+services:
+  ros2-eth-bridge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ros2-eth-bridge
+    network_mode: host
+    ipc: host            # lets ROS 2 shared-memory transport work between containers
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      - OWN_ASSIGNMENTS_ONLY=${OWN_ASSIGNMENTS_ONLY:-true}
+      - ETH_WALLET_PASSPHRASE=${ETH_WALLET_PASSPHRASE:-}
+      - ROS_ETH_DAO_YAML=/config/dao.yaml
+    volumes:
+      - ./configs/dao.yaml:/config/dao.yaml:ro
+      # keystore must exist on the host before the first start
+      - ${WALLET_PATH:-~/.ros_eth/wallet.json}:/root/.ros_eth/wallet.json:ro
+    restart: unless-stopped

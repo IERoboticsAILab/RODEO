@@ -85,8 +85,9 @@ else
     echo -e "  ${YELLOW}⚠${NC} Org-Web .env not found, skipping"
 fi
 
-# Update ROS-ETH Bridge dao.yaml
-BRIDGE_YAML="$REPO_ROOT/dao-bridge/ros-eth-bridge/docker/configs/dao.yaml"
+# Update ROS-ETH Bridge dao.yaml (ROS 1 and ROS 2 bridges)
+for BRIDGE_YAML in "$REPO_ROOT/dao-bridge/ros-eth-bridge/docker/configs/dao.yaml" \
+                   "$REPO_ROOT/dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml"; do
 if [ -f "$BRIDGE_YAML" ]; then
     echo -e "${YELLOW}Updating ROS-ETH Bridge configuration...${NC}"
     # Only match contract addresses (starting with 0x), not abi_paths (starting with /)
@@ -96,8 +97,9 @@ if [ -f "$BRIDGE_YAML" ]; then
     sed -i "s|iecoin: \"0x.*\"|iecoin: \"$IEC_ADDR\"|" "$BRIDGE_YAML"
     echo -e "  ${GREEN}✓${NC} $BRIDGE_YAML"
 else
-    echo -e "  ${YELLOW}⚠${NC} ROS-ETH Bridge dao.yaml not found, skipping"
+    echo -e "  ${YELLOW}⚠${NC} $BRIDGE_YAML not found, skipping"
 fi
+done
 
 echo ""
 echo -e "${GREEN}=====================================${NC}"
