@@ -8,7 +8,7 @@ class Settings:
         self.addresses_path = Path(os.environ.get("ADDRESSES_JSON", "addresses.json"))
         # Use path relative to the project root
         project_root = Path(__file__).parent.parent.parent
-        default_abi_path = project_root / "dao-bridge" / "ros-eth-bridge" / "catkin_ws" / "src" / "ros_eth_bridge" / "abi"
+        default_abi_path = project_root / "dao-bridge" / "ros2-eth-bridge" / "ros2_ws" / "src" / "ros_eth_bridge" / "abi"
         self.base_abi = Path(os.environ.get("BASE_ABI", str(default_abi_path)))
         self.task_manager_name = os.environ.get("TASK_MANAGER_NAME", "TaskManager")
         self.play_rate = float(os.environ.get("PLAY_RATE", "3.0"))

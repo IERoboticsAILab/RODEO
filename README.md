@@ -53,12 +53,16 @@ robotic_decentralized_organization/
 │   └── ganache-docker/        # Local Ethereum blockchain (Ganache)
 │
 ├── dao-bridge/                # ROS-Blockchain integration layer
-│   ├── ros-eth-bridge/        # Bidirectional ROS-Ethereum communication
+│   ├── ros2-eth-bridge/       # Bidirectional ROS 2 - Ethereum communication
 │   └── org-web/               # Web console for DAO management
+│
+├── robot-agent/               # RODEO robot standard: services.yaml, execute_task, proofs
 │
 ├── oracle/                    # Task verification oracle
 │
-└── quick-start/               # Demo scripts and tutorials
+├── quick-start/               # Robot emulator demo (ROS 2)
+│
+└── scripts/                   # update-addresses.sh
 ```
 
 ## Quick Start Guide
@@ -88,6 +92,9 @@ curl -X POST http://localhost:8545 \
 
 **Expected output**: `{"jsonrpc":"2.0","id":1,"result":"0x0"}`
 
+The chain is stored in `blockchain-network/ganache-docker/ganache_db/` (not
+committed). To start again from an empty chain: `docker compose down && sudo rm -rf ganache_db`.
+
 ### Step 2: Deploy Smart Contracts
 
 Deploy the RODEO smart contracts to the local blockchain using Docker:
@@ -105,12 +112,13 @@ To force a rebuild of the deployer image (e.g. after contract changes):
 
 **Important**: After deployment completes, note the contract addresses displayed in the output. You will need to update these addresses in all components.
 
-**Sample output**:
+**Expected output** on a fresh chain (the addresses are deterministic, and are
+the ones already in the committed configs):
 ```
-IECoin deployed to: 0x3Aa5ebB10DC797CAC828524e59A333d0A371443c
-Organization deployed to: 0x093e8F4d8f267d2CeEc9eB889E2054710d187beD
-ServiceManager deployed to: 0xBa3e08b4753E68952031102518379ED2fDADcA30
-TaskManager deployed to: 0xa85b028984bC54A2a3D844B070544F59dDDf89DE
+IECoin:          0x5FbDB2315678afecb367f032d93F642f64180aa3
+Organization:    0x8464135c8F25Da09e49BC8782676a84730C318bC
+ServiceManager:  0x71C95911E9a5D330f4D621842EC243EE1343292e
+TaskManager:     0x712516e61C8B383dF4A63CFe83d7701Bce54B03e
 ```
 
 The deployment addresses are automatically saved to `deployments/1337.json`.
@@ -165,7 +173,7 @@ IECOIN_ADDRESS=0x...
 #### 3.3 Update ROS-Ethereum Bridge Configuration
 
 ```bash
-cd ros-eth-bridge/docker/configs
+cd dao-bridge/ros2-eth-bridge/docker/configs
 nano dao.yaml
 ```
 
@@ -178,7 +186,7 @@ contracts:
   service_manager: "0x..."
 ```
 
-**Reference**: See [dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md](dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md) for details.
+**Reference**: See [dao-bridge/ros2-eth-bridge/README.md](dao-bridge/ros2-eth-bridge/README.md) for details.
 
 ### Step 4: Start Oracle Node
 
@@ -203,24 +211,28 @@ Watching oracle requests and outcomes
 
 ### Step 5: Start ROS-Ethereum Bridge
 
-The bridge enables bidirectional communication between ROS and Ethereum:
+The bridge (ROS 2 Humble) enables bidirectional communication between ROS and Ethereum.
+It signs with the robot's keystore, which you create once:
 
 ```bash
-cd dao-bridge/ros-eth-bridge/docker
-docker compose up -d
+cd dao-bridge/ros2-eth-bridge
+pip3 install eth-account
+python3 scripts/make_wallet.py        # press Enter for an empty dev passphrase
+
+cd docker
+docker compose up -d --build
 
 # Verify bridge is running
-docker logs ros-eth-bridge --tail 30
+docker logs ros2-eth-bridge --tail 30
 ```
 
 **Expected output**:
 ```
-[INFO] dao_listener ready — chain 1337
-[INFO] dao_writer ready — chain 1337 sender 0x...
-[INFO] dao_writer running
+[dao_listener]: dao_listener ready - chain 1337 ... assignments for 0x15d34AAf... only
+[dao_writer]: dao_writer ready - chain 1337  sender 0x15d34AAf...
 ```
 
-**Reference**: [dao-bridge/ros-eth-bridge/docker/README.md](dao-bridge/ros-eth-bridge/docker/README.md)
+**Reference**: [dao-bridge/ros2-eth-bridge/README.md](dao-bridge/ros2-eth-bridge/README.md)
 
 ### Step 6: Start Web Console
 
@@ -231,7 +243,7 @@ cd dao-bridge/org-web
 docker compose up -d
 
 # Verify web console is running
-docker logs rodeo-org-web --tail 20
+docker logs org-web-console --tail 20
 ```
 
 Access the console at: **http://localhost:8080**
@@ -264,13 +276,10 @@ cd quick-start/docker
 On subsequent runs (service already registered on-chain), skip registration:
 
 ```bash
-# Edit docker-compose.yml and uncomment the --skip-registration command override,
-# or stop the container and run with the flag directly:
-docker run --rm --network host \
-  -v $(pwd)/../oracle/proofs:/root/oracle/proofs:ro \
-  robot-emulator-demo \
-  python3 /root/robot_emulator_ws/robot_emulator_demo.py --skip-registration
+SKIP_REGISTRATION=true ./robot-emulator.sh start
 ```
+
+The emulator uses the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 
 **The demo will**:
 1. Register a delivery service on the blockchain (check the web UI and you will see a new service being created)
@@ -303,29 +312,20 @@ rodeo-oracle  | Task 1 verified
 ```
 7. Next check the web console, in the home tab you can see that the payment is released to the robot.
 
-**Expected output**:
+**Expected output** (abridged):
 ```
-==============================================================
-RODEO Robot Emulator - Full Integration Demo
-==============================================================
+RODEO Robot Emulator - Full Integration Demo (ROS 2)
 ✅ Action servers connected!
-
 📝 Step 1: Registering delivery service...
-✅ Service registered successfully!
-
-🎯 Step 2: TASK ASSIGNED!
-   Task ID: 1
-   Reward: 100.0 IEC
-
-🤖 Step 3: Executing task...
+✅ Service registered! TX: 0x...  Block: 13
+✅ Robot ready - listening for task assignments
+🎯 Task assigned! ID: 1  Reward: 100.0 IEC
+🤖 Step 3: Executing task (10 seconds simulation)...
 ✅ Task execution completed!
-
 📤 Step 4: Submitting proof of completion...
-✅ Proof submitted successfully!
-
-⏳ Step 5: Waiting for oracle validation...
-✅ Task verified by oracle!
-💰 Payment received!
+✅ Proof submitted! TX: 0x...  Block: 15
+🔍 Step 5: Waiting for oracle validation...
+🏆 Task 1 verified — reward received!
 ```
 
 Monitor the oracle logs to see the validation process:

@@ -1,9 +1,8 @@
 # ROS 2 – Ethereum bridge (RODEO, ROS 2 Humble)
 
-ROS 2 port of `dao-bridge/ros-eth-bridge` (ROS 1 Noetic). It exposes the same
-actions, services and topics, so a robot talks to the RODEO contracts the same
-way it did through the ROS 1 bridge. The ROS 1 bridge is unchanged and stays in
-the repository until the ROS 2 version has replaced it everywhere.
+ROS 2 port of the original ROS 1 Noetic `ros-eth-bridge` (still on the `main`
+branch). It exposes the same actions, services and topics, so a robot talks to
+the RODEO contracts the same way it did through the ROS 1 bridge.
 
 ```
 ros2_ws/src/
@@ -14,6 +13,7 @@ ros2_ws/src/
     ├── config/dao.yaml
     └── launch/ros_eth_gateway.launch.py
 docker/                Humble image, compose file, mounted dao.yaml
+scripts/make_wallet.py the robot's encrypted keystore
 ```
 
 One bridge instance holds one wallet. Run one per robot, each in its own namespace.
@@ -52,16 +52,13 @@ are `/panther/dao/...`.
 
 ## Run with Docker
 
-Prerequisites: Ganache running with the contracts deployed, org-web and the
-oracle up (see the top-level README), and the robot keystore at
-`~/.ros_eth/wallet.json`.
+Prerequisites: Ganache running with the contracts deployed, and org-web and the
+oracle up (see the top-level README).
 
 ```bash
-# stop the ROS 1 bridge and emulator first (one wallet, one bridge)
-docker stop ros-eth-bridge robot-emulator-demo 2>/dev/null
-
-# the oracle now starts its own ROS 1 master for rosbag replay: rebuild it once
-cd oracle/docker && docker compose up -d --build
+# robot keystore, once (press Enter for an empty dev passphrase)
+pip3 install eth-account
+python3 dao-bridge/ros2-eth-bridge/scripts/make_wallet.py   # -> ~/.ros_eth/wallet.json
 
 cd dao-bridge/ros2-eth-bridge/docker
 cp .env.example .env            # optional: ROS_DOMAIN_ID, ROBOT_NAMESPACE, passphrase
@@ -72,7 +69,7 @@ docker logs -f ros2-eth-bridge  # expect "dao_listener ready" and "dao_writer re
 ### Acceptance test: the ROS 2 robot emulator
 
 ```bash
-cd quick-start/ros2/docker
+cd quick-start/docker
 ./robot-emulator.sh build
 ./robot-emulator.sh start
 ./robot-emulator.sh logs
@@ -105,7 +102,8 @@ ros2 launch ros_eth_bridge ros_eth_gateway.launch.py \
   checked against web3 7 first.
 * **Oracle.** The oracle still validates ROS 1 bags with `rosbag play`, which
   needs a ROS 1 master. The ROS 1 bridge used to start one; the oracle's
-  entrypoint now starts its own when none is running.
+  entrypoint now starts its own when none is running. The oracle also reads
+  its contract ABIs from this package's `abi/` folder.
 * **DDS between containers.** Both compose files use `network_mode: host` and
   `ipc: host`, which ROS 2's shared-memory transport needs across containers.
 * **Addresses.** `scripts/update-addresses.sh` updates `docker/configs/dao.yaml`

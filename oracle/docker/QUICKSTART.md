@@ -7,7 +7,7 @@ Before building, ensure you have:
 1. ✅ Docker and Docker Compose installed
 2. ✅ Blockchain running (Ganache at `http://localhost:8545` or update in `.env`)
 3. ✅ Contract addresses configured (see Configuration below)
-4. ✅ ABI files exist at `dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi/`
+4. ✅ ABI files exist at `dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi/`
 
 ## Configuration
 
@@ -198,7 +198,7 @@ docker logs rodeo-oracle
    Could not start watcher
    ```
    - Solution: Verify ABI path in docker-compose.yml
-   - Check: `ls ../../dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi/`
+   - Check: `ls ../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi/`
 
 3. **Wrong RPC URL**:
    ```

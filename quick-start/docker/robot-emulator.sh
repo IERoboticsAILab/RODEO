@@ -79,9 +79,9 @@ case "${1:-help}" in
         ;;
     
     status)
-        if docker ps | grep -q "robot-emulator-demo"; then
+        if docker ps | grep -q "robot-emulator"; then
             echo "✅ Robot emulator is running"
-            docker ps --filter "name=robot-emulator-demo" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --filter "name=robot-emulator" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
         else
             echo "❌ Robot emulator is not running"
         fi
@@ -89,7 +89,7 @@ case "${1:-help}" in
     
     shell)
         echo "🐚 Opening shell in robot emulator container..."
-        docker exec -it robot-emulator-demo bash
+        docker exec -it robot-emulator bash
         ;;
     
     help|--help|-h)

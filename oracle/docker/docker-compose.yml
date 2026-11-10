@@ -48,7 +48,7 @@ services:
       - ROS_HOSTNAME=localhost
     volumes:
       # Mount ABI files
-      - ../../dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
+      - ../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
       
       # Also mount to /workspace/proofs for convenience
       - ../proofs:/workspace/proofs:ro

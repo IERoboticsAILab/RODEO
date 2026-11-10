@@ -1,62 +1,102 @@
 #!/usr/bin/env python3
 """
-Robot emulator for RODEO full integration demo.
+Robot emulator for the RODEO integration demo - ROS 2 version.
 
-This script simulates a robot that:
-1. Registers a delivery service on the blockchain
-2. Monitors for task assignments
-3. Executes tasks (simulated with sleep)
-4. Submits proof of completion
+ROS 2 port of the original ROS 1 robot_emulator_demo.py, used as the
+acceptance test for the ROS 2 bridge:
+    1. register a delivery service           (dao/register_service_action)
+    2. wait for an assignment                 (dao/task_assigned)
+    3. "execute" it (10 s countdown)
+    4. submit the pre-recorded proof bag      (dao/submit_proof_action)
+    5. report the oracle's verdict            (dao/task_verified / dao/task_rejected)
+
+Names are relative, so run it in the bridge's namespace:
+    ros2 run ... --ros-args -r __ns:=/panther
 """
+from __future__ import annotations
 
-import rospy
-import time
 import os
-import actionlib
-from ros_eth_msgs.msg import (
-    RegisterServiceAction, RegisterServiceGoal,
-    SubmitProofAction, SubmitProofGoal,
-    TaskAssignment, TaskId
-)
+import sys
+import threading
+import time
 
-class RobotEmulator:
-    def __init__(self, skip_registration=False):
-        rospy.init_node('robot_emulator_demo', anonymous=True)
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
+from rclpy.node import Node
 
-        rospy.loginfo("=" * 60)
-        rospy.loginfo("RODEO Robot Emulator - Full Integration Demo")
-        rospy.loginfo("=" * 60)
+from ros_eth_msgs.action import RegisterService, SubmitProof
+from ros_eth_msgs.msg import TaskAssignment, TaskId, TaskRejection
+
+DEFAULT_PROOF = "/root/oracle/proofs/task_tid10_20250910_145742.bag"
+
+
+class RobotEmulator(Node):
+    def __init__(self, skip_registration: bool = False):
+        super().__init__("robot_emulator_demo")
+        log = self.get_logger()
+        log.info("=" * 60)
+        log.info("RODEO Robot Emulator - Full Integration Demo (ROS 2)")
+        log.info("=" * 60)
 
         self.skip_registration = skip_registration
-        self.assigned_tasks = []
-        self.proof_submitted_tasks = []
-        self.service_registered = False
+        self.proof_file = os.environ.get("PROOF_FILE", DEFAULT_PROOF)
+        self.assigned_tasks: set[int] = set()
+        self.proof_submitted_tasks: set[int] = set()
+        self._lock = threading.Lock()
 
-        # Action clients
-        self.register_service_client = actionlib.SimpleActionClient(
-            '/dao/register_service_action', RegisterServiceAction
-        )
-        self.submit_proof_client = actionlib.SimpleActionClient(
-            '/dao/submit_proof_action', SubmitProofAction
-        )
+        cb = ReentrantCallbackGroup()
+        self.register_service_client = ActionClient(
+            self, RegisterService, "dao/register_service_action", callback_group=cb)
+        self.submit_proof_client = ActionClient(
+            self, SubmitProof, "dao/submit_proof_action", callback_group=cb)
 
-        rospy.loginfo("⏳ Waiting for action servers...")
-        if not self.register_service_client.wait_for_server(timeout=rospy.Duration(30)):
-            raise Exception("❌ Register service action server not available")
-        if not self.submit_proof_client.wait_for_server(timeout=rospy.Duration(30)):
-            raise Exception("❌ Submit proof action server not available")
-        rospy.loginfo("✅ Action servers connected!")
+        self.create_subscription(TaskAssignment, "dao/task_assigned",
+                                 self.on_task_assigned, 50, callback_group=cb)
+        self.create_subscription(TaskId, "dao/task_verified",
+                                 self.on_task_verified, 50, callback_group=cb)
+        self.create_subscription(TaskRejection, "dao/task_rejected",
+                                 self.on_task_rejected, 50, callback_group=cb)
 
-        rospy.Subscriber('/dao/task_assigned', TaskAssignment, self.on_task_assigned)
-        rospy.Subscriber('/dao/task_verified', TaskId, self.on_task_verified)
+    # ------------------------------------------------------------------ helpers
+    def _call_action(self, client: ActionClient, goal, timeout: float):
+        """Send a goal and block (outside the executor thread) until its result."""
+        done = threading.Event()
+        box = {}
 
-    def register_service(self):
-        """Register delivery service on blockchain"""
-        rospy.loginfo("")
-        rospy.loginfo("📝 Step 1: Registering delivery service...")
-        rospy.loginfo("-" * 60)
+        def on_result(fut):
+            box["result"] = fut.result().result
+            done.set()
 
-        goal = RegisterServiceGoal()
+        def on_goal(fut):
+            gh = fut.result()
+            if not gh.accepted:
+                box["result"] = None
+                done.set()
+                return
+            gh.get_result_async().add_done_callback(on_result)
+
+        client.send_goal_async(goal).add_done_callback(on_goal)
+        if not done.wait(timeout):
+            return None, True
+        return box.get("result"), False
+
+    def wait_for_servers(self) -> None:
+        self.get_logger().info("⏳ Waiting for action servers...")
+        if not self.register_service_client.wait_for_server(timeout_sec=30.0):
+            raise RuntimeError("❌ Register service action server not available")
+        if not self.submit_proof_client.wait_for_server(timeout_sec=30.0):
+            raise RuntimeError("❌ Submit proof action server not available")
+        self.get_logger().info("✅ Action servers connected!")
+
+    # ------------------------------------------------------------------ steps
+    def register_service(self) -> None:
+        log = self.get_logger()
+        log.info("")
+        log.info("📝 Step 1: Registering delivery service...")
+        log.info("-" * 60)
+        goal = RegisterService.Goal()
         goal.name = "Delivery Service"
         goal.description = "Autonomous package delivery robot"
         goal.category = "Logistics"
@@ -64,134 +104,140 @@ class RobotEmulator:
         goal.price = "100"
         goal.provider_type = 0  # Robot
         goal.min_confirmations = 1
+        log.info(f"   Name: {goal.name}  |  Category: {goal.category}  |  Price: {goal.price} IEC")
+        log.info("⏳ Waiting for blockchain transaction...")
 
-        rospy.loginfo(f"   Name: {goal.name}  |  Category: {goal.category}  |  Price: {goal.price} IEC")
-
-        self.register_service_client.send_goal(goal)
-        rospy.loginfo("⏳ Waiting for blockchain transaction...")
-
-        if not self.register_service_client.wait_for_result(timeout=rospy.Duration(60)):
-            rospy.logerr("❌ Service registration timed out")
-            return
-
-        result = self.register_service_client.get_result()
-        if result and result.ok:
-            rospy.loginfo(f"✅ Service registered! TX: {result.tx_hash}  Block: {result.block_number}")
-            self.service_registered = True
+        result, timed_out = self._call_action(self.register_service_client, goal, 60.0)
+        if timed_out:
+            log.error("❌ Service registration timed out")
+        elif result is not None and result.ok:
+            log.info(f"✅ Service registered! TX: {result.tx_hash}  Block: {result.block_number}")
         else:
-            rospy.logerr("❌ Service registration failed")
+            log.error("❌ Service registration failed")
 
-    def on_task_assigned(self, msg):
-        """Callback for task assignment events"""
-        if msg.task_id in self.assigned_tasks:
-            return
-        self.assigned_tasks.append(msg.task_id)
+    def on_task_assigned(self, msg: TaskAssignment) -> None:
+        with self._lock:
+            if msg.task_id in self.assigned_tasks:
+                return
+            self.assigned_tasks.add(msg.task_id)
+        # Work happens in its own thread so the executor keeps spinning.
+        threading.Thread(target=self._execute, args=(msg,), daemon=True).start()
 
+    def _execute(self, msg: TaskAssignment) -> None:
+        log = self.get_logger()
         reward_iec = int(msg.reward_wei) / 10**18
-        rospy.loginfo("")
-        rospy.loginfo("=" * 60)
-        rospy.loginfo(f"🎯 Task assigned! ID: {msg.task_id}  Reward: {reward_iec} IEC")
-        rospy.loginfo("=" * 60)
-
-        rospy.loginfo("🤖 Step 3: Executing task (10 seconds simulation)...")
+        log.info("")
+        log.info("=" * 60)
+        log.info(f"🎯 Task assigned! ID: {msg.task_id}  Reward: {reward_iec} IEC")
+        log.info("=" * 60)
+        log.info("🤖 Step 3: Executing task (10 seconds simulation)...")
         for i in range(10, 0, -1):
-            rospy.loginfo(f"   ⏱  {i}s remaining...")
+            log.info(f"   ⏱  {i}s remaining...")
             time.sleep(1)
-        rospy.loginfo("✅ Task execution completed!")
-
+        log.info("✅ Task execution completed!")
         self.submit_proof(msg.task_id)
 
-    def submit_proof(self, task_id):
-        """Submit task completion proof as .bag file"""
-        rospy.loginfo("")
-        rospy.loginfo("📤 Step 4: Submitting proof of completion...")
-        rospy.loginfo("-" * 60)
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(script_dir)
-        proof_file = os.path.join(project_root, "oracle", "proofs", "task_tid10_20250910_145742.bag")
-
-        if not os.path.exists(proof_file):
-            rospy.logerr(f"❌ Proof file not found: {proof_file}")
+    def submit_proof(self, task_id: int) -> None:
+        log = self.get_logger()
+        log.info("")
+        log.info("📤 Step 4: Submitting proof of completion...")
+        log.info("-" * 60)
+        if not os.path.exists(self.proof_file):
+            log.error(f"❌ Proof file not found: {self.proof_file}")
             return
+        log.info(f"   Proof: {self.proof_file} ({os.path.getsize(self.proof_file)} bytes)")
 
-        rospy.loginfo(f"   Proof: {proof_file} ({os.path.getsize(proof_file)} bytes)")
-
-        goal = SubmitProofGoal()
-        goal.task_id = task_id
-        goal.proof_uri = f"file://{proof_file}"
+        goal = SubmitProof.Goal()
+        goal.task_id = int(task_id)
+        goal.proof_uri = f"file://{self.proof_file}"
         goal.min_confirmations = 1
+        log.info("⏳ Submitting to blockchain...")
 
-        self.submit_proof_client.send_goal(goal)
-        rospy.loginfo("⏳ Submitting to blockchain...")
-
-        if not self.submit_proof_client.wait_for_result(timeout=rospy.Duration(60)):
-            rospy.logerr("❌ Proof submission timed out")
-            return
-
-        result = self.submit_proof_client.get_result()
-        if result and result.ok:
-            rospy.loginfo(f"✅ Proof submitted! TX: {result.tx_hash}  Block: {result.block_number}")
-            rospy.loginfo("🔍 Step 5: Waiting for oracle validation...")
-            self.proof_submitted_tasks.append(task_id)
+        result, timed_out = self._call_action(self.submit_proof_client, goal, 60.0)
+        if timed_out:
+            log.error("❌ Proof submission timed out")
+        elif result is not None and result.ok:
+            log.info(f"✅ Proof submitted! TX: {result.tx_hash}  Block: {result.block_number}")
+            log.info("🔍 Step 5: Waiting for oracle validation...")
+            with self._lock:
+                self.proof_submitted_tasks.add(task_id)
         else:
-            rospy.logerr("❌ Proof submission failed")
+            log.error("❌ Proof submission failed")
 
-    def on_task_verified(self, msg):
-        """Callback for task verification events from the oracle"""
-        if msg.task_id not in self.proof_submitted_tasks:
-            return
-        rospy.loginfo("")
-        rospy.loginfo("=" * 60)
-        rospy.loginfo(f"🏆 Task {msg.task_id} verified — reward received!")
-        rospy.loginfo("   Oracle validated the proof successfully.")
-        rospy.loginfo("   Demo complete! ✅")
-        rospy.loginfo("=" * 60)
-        rospy.loginfo("")
+    def on_task_verified(self, msg: TaskId) -> None:
+        with self._lock:
+            if msg.task_id not in self.proof_submitted_tasks:
+                return
+        log = self.get_logger()
+        log.info("")
+        log.info("=" * 60)
+        log.info(f"🏆 Task {msg.task_id} verified — reward received!")
+        log.info("   Oracle validated the proof successfully.")
+        log.info("   Demo complete! ✅")
+        log.info("=" * 60)
+        log.info("")
 
-    def run(self):
-        """Main execution loop"""
-        rospy.loginfo("")
-        rospy.loginfo("🚀 Starting robot emulator...")
+    def on_task_rejected(self, msg: TaskRejection) -> None:
+        with self._lock:
+            if msg.task_id not in self.proof_submitted_tasks:
+                return
+        self.get_logger().error(f"❌ Task {msg.task_id} rejected by the oracle: {msg.reason}")
 
+    def run_setup(self) -> None:
+        log = self.get_logger()
+        log.info("")
+        log.info("🚀 Starting robot emulator...")
+        self.wait_for_servers()
         if self.skip_registration:
-            rospy.loginfo("⏭️  Skipping service registration")
+            log.info("⏭️  Skipping service registration")
         else:
             self.register_service()
-
-        rospy.loginfo("")
-        rospy.loginfo("=" * 60)
-        rospy.loginfo("✅ Robot ready - listening for task assignments")
-        rospy.loginfo("=" * 60)
-        rospy.loginfo("")
-        rospy.loginfo("📋 Next steps:")
-        rospy.loginfo("   1. Open web console: http://localhost:8080")
-        rospy.loginfo("   2. Navigate to 'Tasks' page")
-        rospy.loginfo("   3. Click 'Register New Task'")
-        rospy.loginfo("   4. Fill in task details:")
-        rospy.loginfo("      - Description: Package delivery")
-        rospy.loginfo("      - Category: Logistics")
-        rospy.loginfo("      - Task Type: ItemTransport")
-        rospy.loginfo("      - Reward: 100 IEC")
-        rospy.loginfo("   5. Submit and watch this robot automatically:")
-        rospy.loginfo("      → Receive assignment")
-        rospy.loginfo("      → Execute task")
-        rospy.loginfo("      → Submit proof")
-        rospy.loginfo("      → Get paid!")
-        rospy.loginfo("")
-        rospy.spin()
+        log.info("")
+        log.info("=" * 60)
+        log.info("✅ Robot ready - listening for task assignments")
+        log.info("=" * 60)
+        log.info("")
+        log.info("📋 Next steps:")
+        log.info("   1. Open web console: http://localhost:8080")
+        log.info("   2. Navigate to 'Tasks' page")
+        log.info("   3. Click 'Register New Task'")
+        log.info("   4. Fill in task details:")
+        log.info("      - Description: Package delivery")
+        log.info("      - Category: Logistics")
+        log.info("      - Task Type: ItemTransport")
+        log.info("      - Reward: 100 IEC")
+        log.info("   5. Submit and watch this robot automatically:")
+        log.info("      → Receive assignment")
+        log.info("      → Execute task")
+        log.info("      → Submit proof")
+        log.info("      → Get paid!")
+        log.info("")
 
 
-def main():
-    import sys
-    skip_registration = '--skip-registration' in sys.argv
+def main(args=None):
+    skip_registration = "--skip-registration" in sys.argv
+    rclpy.init(args=args)
+    node = RobotEmulator(skip_registration=skip_registration)
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+
+    def setup():
+        try:
+            node.run_setup()
+        except Exception as e:  # noqa: BLE001
+            node.get_logger().error(f"Fatal error: {e}")
+            rclpy.try_shutdown()
+
+    threading.Thread(target=setup, daemon=True).start()
     try:
-        robot = RobotEmulator(skip_registration=skip_registration)
-        robot.run()
-    except (rospy.ROSInterruptException, KeyboardInterrupt):
-        rospy.loginfo("Shutting down robot emulator...")
-    except Exception as e:
-        rospy.logerr(f"Fatal error: {e}")
+        executor.spin()
+    except (KeyboardInterrupt, ExternalShutdownException):
+        node.get_logger().info("Shutting down robot emulator...")
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.try_shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

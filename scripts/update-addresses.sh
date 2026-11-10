@@ -85,9 +85,8 @@ else
     echo -e "  ${YELLOW}⚠${NC} Org-Web .env not found, skipping"
 fi
 
-# Update ROS-ETH Bridge dao.yaml (ROS 1 and ROS 2 bridges)
-for BRIDGE_YAML in "$REPO_ROOT/dao-bridge/ros-eth-bridge/docker/configs/dao.yaml" \
-                   "$REPO_ROOT/dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml"; do
+# Update ROS-ETH Bridge dao.yaml
+for BRIDGE_YAML in "$REPO_ROOT/dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml"; do
 if [ -f "$BRIDGE_YAML" ]; then
     echo -e "${YELLOW}Updating ROS-ETH Bridge configuration...${NC}"
     # Only match contract addresses (starting with 0x), not abi_paths (starting with /)
@@ -110,10 +109,10 @@ echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Restart all Docker containers to apply changes:"
 echo "   cd oracle/docker && docker compose restart"
 echo "   cd ../../dao-bridge/org-web && docker compose restart"
-echo "   cd ../ros-eth-bridge/docker && docker compose restart"
+echo "   cd ../ros2-eth-bridge/docker && docker compose restart"
 echo ""
 echo "2. Verify configurations:"
 echo "   docker logs rodeo-oracle | grep -i address"
-echo "   docker logs rodeo-org-web | grep -i address"
-echo "   docker logs ros-eth-bridge | grep -i chain"
+echo "   docker logs org-web-console | grep -i address"
+echo "   docker logs ros2-eth-bridge | grep -i ready"
 echo ""

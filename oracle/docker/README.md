@@ -127,7 +127,7 @@ docker run -it --rm \
   -e RPC_URL=http://10.205.10.9:8545 \
   -e ADDRESSES_JSON=/workspace/addresses.json \
   -e BASE_ABI=/workspace/abi \
-  -v $(pwd)/dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi:/workspace/abi:ro \
+  -v $(pwd)/dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro \
   -v $(pwd)/oracle:/workspace/bags:ro \
   rodeo-oracle:latest
 ```

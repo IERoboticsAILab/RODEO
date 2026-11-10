@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Local chain data (Ganache writes here; never commit it)
+blockchain-network/ganache-docker/ganache_db/
+blockchain-network/ganache-docker/docker-compose.override.yml
+
+# colcon
+build/
+install/
+log/
+
+# per-machine config copied from .env.example
+dao-bridge/ros2-eth-bridge/docker/.env

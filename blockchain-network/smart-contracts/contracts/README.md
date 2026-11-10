@@ -216,4 +216,4 @@ These can be extended for custom implementations.
 
 ## License
 
-MIT License - See [LICENSE](../../../LICENSE)
+MIT License - See [LICENSE](../../../LICENSE.md)

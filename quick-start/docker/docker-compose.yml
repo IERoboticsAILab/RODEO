@@ -1,19 +1,21 @@
+# Robot emulator: acceptance test for the bridge (ROS 2).
+name: rodeo-robot-emulator
+
 services:
   robot-emulator:
     build:
       context: ../..
       dockerfile: quick-start/docker/Dockerfile
-    container_name: robot-emulator-demo
+    container_name: robot-emulator
     network_mode: host
+    ipc: host
     environment:
-      - ROS_MASTER_URI=http://localhost:11311
-      - ROS_HOSTNAME=localhost
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}      # same as the bridge
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}    # same as the bridge
+      - SKIP_REGISTRATION=${SKIP_REGISTRATION:-false}
+      - PROOF_FILE=/root/oracle/proofs/task_tid10_20250910_145742.bag
     volumes:
-      # Mount proof files directory at expected path
+      # same path the oracle container uses, so the file:// URI resolves there
       - ../../oracle/proofs:/root/oracle/proofs:ro
-    stdin_open: true
-    tty: true
-    restart: unless-stopped
-    # To skip service registration (for subsequent runs):
-    # Uncomment the line below:
-    # command: python3 /root/robot_emulator_ws/robot_emulator_demo.py --skip-registration
+    # no auto-restart: every restart would register another service
+    restart: "no"

@@ -1,46 +1,16 @@
-FROM ros:noetic-ros-base-focal
-
-# Use bash for RUN commands to support 'source'
+FROM ros:humble-ros-base
 SHELL ["/bin/bash", "-c"]
+ENV PYTHONUNBUFFERED=1
 
-# Install Python dependencies
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-rospy \
-    python3-actionlib \
-    python3-catkin-pkg-modules \
-    python3-rosdep \
-    ros-noetic-actionlib \
-    ros-noetic-actionlib-msgs \
-    ros-noetic-message-generation \
-    ros-noetic-message-runtime \
-    && rm -rf /var/lib/apt/lists/*
+# Build only the message package (build context is the repo root)
+WORKDIR /ros2_ws
+COPY dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_msgs ./src/ros_eth_msgs
+RUN source /opt/ros/humble/setup.bash && colcon build && rm -rf build log
 
-# Build catkin workspace with ros_eth_msgs
-# Build context is repo root
-WORKDIR /root/catkin_ws
-COPY dao-bridge/ros-eth-bridge/catkin_ws/src /root/catkin_ws/src
-RUN source /opt/ros/noetic/setup.bash && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y && \
-    catkin_make
-
-# Create robot emulator workspace
 WORKDIR /root/robot_emulator_ws
-
-# Copy robot emulator script (context is repo root)
-COPY quick-start/robot_emulator_demo.py /root/robot_emulator_ws/robot_emulator_demo.py
-RUN chmod +x /root/robot_emulator_ws/robot_emulator_demo.py
-
-# Setup ROS environment
-RUN echo "source /opt/ros/noetic/setup.bash" >> /root/.bashrc
-
-# Set entrypoint (context is repo root)
+COPY quick-start/robot_emulator_demo.py ./robot_emulator_demo.py
 COPY quick-start/docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x ./robot_emulator_demo.py /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python3", "/root/robot_emulator_ws/robot_emulator_demo.py"]
-
-# To skip registration on subsequent runs:
-# docker run <image> python3 /root/robot_emulator_ws/robot_emulator_demo.py --skip-registration
+CMD ["emulator"]

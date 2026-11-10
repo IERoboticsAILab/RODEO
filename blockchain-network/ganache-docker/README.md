@@ -15,7 +15,7 @@ RPC endpoint: `http://localhost:8545`
 - **Chain ID:** 1337
 - **Accounts:** 20 pre-funded accounts (1000 ETH each)
 - **Mnemonic:** `test test test test test test test test test test test junk`
-- **Persistence:** Blockchain state saved to `./ganache_db/`
+- **Persistence:** Blockchain state saved to `./ganache_db/` (created on first start, not committed) (created on first start, not committed)
 
 ## Account Keys
 
