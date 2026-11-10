@@ -1,38 +1,40 @@
-# Quick Start: robot emulator
+# Quick Start: demo without a robot
 
-[robot_emulator_demo.py](robot_emulator_demo.py) is a ROS 2 node that plays a
-robot through the full RODEO lifecycle without a real robot, using the ROS 2
-bridge:
+The demo runs a robot's RODEO software exactly as on a real robot, with a fake
+executor standing in for the robot itself:
 
 ```
-[Register service] → [Receive task] → [Execute task] → [Submit proof] → [Receive reward]
+bridge (wallet)  ←→  agent  ←→  fake executor
 ```
 
-| Step | What happens |
-|------|-------------|
-| 1 | Connects to the bridge's action servers |
-| 2 | Registers a **Delivery Service** (`dao/register_service_action`) |
-| 3 | Waits on `dao/task_assigned` for a task assigned to its wallet |
-| 4 | Simulates the task (10-second countdown) |
-| 5 | Submits a pre-recorded bag as proof (`dao/submit_proof_action`) |
-| 6 | Reports the oracle's verdict (`dao/task_verified` / `dao/task_rejected`) |
+- The **agent** (`robot-agent/`) registers the robot's services from its
+  `services.yaml`, receives assignments, sends each task to the executor,
+  hashes the proof and submits it, and handles the oracle's verdict.
+- The **fake executor** serves `rodeo/execute_task` like a real robot would: in
+  about 15 s it "drives" to the pick-up place, loads, drives to the drop-off
+  place, unloads and records the recipient's confirmation, writing a standard
+  RODEO proof bag along the way.
 
-It is also the acceptance test for the bridge: a bridge change is good when
-this run still ends with the task verified.
+It uses the Panther's `services.yaml` (Delivery service, nine lab places), so a
+task runs exactly as it will on the Panther, minus the driving. It is also the
+acceptance test for the bridge and the agent: a change is good when this run
+still ends with the task verified.
 
-## Running with Docker
+## Run it
 
 Prerequisites (see the top-level README): Ganache with the contracts deployed,
 org-web, the oracle and the ROS 2 bridge running.
 
 ```bash
 cd quick-start/docker
-./robot-emulator.sh build      # first time, or after changing the script
-./robot-emulator.sh start
-./robot-emulator.sh logs
+./demo.sh build      # first time, or after code changes
+./demo.sh start
+./demo.sh logs
 ```
 
-Then create a task in org-web (`http://localhost:8080`, Tasks tab):
+The agent logs `register service 'Delivery' ...: ok` (or reuses the service
+it registered before) and then `ready - waiting for assignments`. Create a task
+in org-web (`http://localhost:8080`, Tasks tab):
 
 | Field | Value |
 |---|---|
@@ -43,26 +45,40 @@ Then create a task in org-web (`http://localhost:8080`, Tasks tab):
 | Reward | 100 |
 
 Category and Type must match exactly: that is how the contract matches the task
-to the service.
+to the service. A free-text description runs the Delivery service with its
+default places (package pick-up to package drop-off). To choose the places, put
+JSON in the Description field instead:
+
+```json
+{"v": 1, "params": {"pickup": "farah_desk", "dropoff": "samuel_desk", "sender": "Farah", "recipient": "Samuel"}, "note": "fragile"}
+```
+
+The run succeeds when the agent logs `task N: VERIFIED - reward paid`.
+`./demo.sh stop` stops both containers; the agent deactivates its service
+first, so no new task is assigned while it is down.
+
+## Settings
 
 | Setting | Default | Notes |
 |---|---|---|
 | `ROS_DOMAIN_ID` | 40 | must match the bridge |
 | `ROBOT_NAMESPACE` | none | must match the bridge, e.g. `panther` |
-| `SKIP_REGISTRATION` | false | `SKIP_REGISTRATION=true ./robot-emulator.sh start` when the service is already registered |
+| `PROOF_MODE` | `legacy` | see below |
+| `SERVICES_FILE` | the Panther's `services.yaml` | any robot's `services.yaml` |
 
-The container does not restart on its own, since every start registers another
-service. Stop it with `./robot-emulator.sh stop`.
+Set them in the shell or in `quick-start/docker/.env`.
 
-## Running without Docker
+**Proof mode.** Today's oracle can only validate the ROS 1 bag from the
+original waste-sorting demo. In `legacy` mode the fake executor still writes
+the RODEO proof (to `oracle/proofs/task<id>_<robot>_<time>/`), but hands the
+agent that sample bag to submit, so the current oracle approves the task. Once
+the oracle validates RODEO proofs, set `PROOF_MODE=rodeo`.
+
+## Inspect a proof
 
 ```bash
-source /opt/ros/humble/setup.bash
-source dao-bridge/ros2-eth-bridge/ros2_ws/install/setup.bash   # after colcon build there
-PROOF_FILE=$PWD/oracle/proofs/task_tid10_20250910_145742.bag \
-  python3 quick-start/robot_emulator_demo.py [--skip-registration] [--ros-args -r __ns:=/panther]
+docker exec rodeo-demo-agent bash -ic "ros2 bag info /root/oracle/proofs/task1_panther_<time>"
 ```
 
-The oracle must be able to open the proof path, so outside Docker use a path
-the oracle container also mounts (`oracle/proofs` is mounted at
-`/root/oracle/proofs`).
+It holds `/rodeo/manifest`, `/rodeo/pose`, `/rodeo/events` and
+`/rodeo/payload_weight`; see `robot-agent/README.md`.

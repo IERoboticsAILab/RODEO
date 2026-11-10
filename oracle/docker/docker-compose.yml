@@ -53,8 +53,8 @@ services:
       # Also mount to /workspace/proofs for convenience
       - ../proofs:/workspace/proofs:ro
 
-      # Mount to /root/oracle/proofs — path used when robot_emulator runs inside Docker
-      # (script lives at /root/robot_emulator_ws/robot_emulator_demo.py → project_root=/root)
+      # Mount to /root/oracle/proofs: the path the robot agent and executors use for
+      # proofs (robot-agent and quick-start compose files mount the same folder there)
       - ../proofs:/root/oracle/proofs:ro
       
       # Optional: Mount addresses file if you want to modify it

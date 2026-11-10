@@ -124,3 +124,27 @@ def test_proof_uri_and_hash(tmp_path):
     assert parse_proof_uri("file:///root/oracle/proofs/a.bag") == ("/root/oracle/proofs/a.bag", None)
     with pytest.raises(ValueError):
         parse_proof_uri("ipfs://Qm123")
+
+
+# ---------------------------------------------------------------- defaults
+def test_defaults_fill_free_text_tasks():
+    from rodeo_common.service_description import resolve_task_params
+    d = base_cfg()
+    d["services"][0]["params"]["pickup"]["default"] = "a"
+    d["services"][0]["params"]["dropoff"]["default"] = "b"
+    cfg = parse_robot_config(d)
+    sd = parse_service_description(encode_service_description(cfg, cfg.services[0]))
+    assert sd.params["pickup"]["default"] == "a"
+    resolved, errs = resolve_task_params(sd, parse_task_description("Package delivery").params)
+    assert errs == [] and resolved["pickup"] == "a" and resolved["dropoff"] == "b"
+    resolved, errs = resolve_task_params(sd, {"dropoff": "a"})          # explicit value wins
+    assert errs == [] and resolved == {"pickup": "a", "dropoff": "a"}
+
+
+def test_bad_defaults_rejected():
+    d = base_cfg(); d["services"][0]["params"]["pickup"]["default"] = "nowhere"
+    with pytest.raises(ConfigError, match="default place"):
+        parse_robot_config(d)
+    d = base_cfg(); d["services"][0]["params"]["w"]["default"] = "heavy"
+    with pytest.raises(ConfigError, match="does not match type"):
+        parse_robot_config(d)

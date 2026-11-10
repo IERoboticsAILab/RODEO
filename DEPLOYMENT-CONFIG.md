@@ -107,7 +107,7 @@ docker compose restart
 ## 5. Robot scripts
 
 Robots never hold contract addresses themselves: they call the bridge's actions
-and services, and the bridge reads `dao.yaml`. The robot emulator in
+and services, and the bridge reads `dao.yaml`. The demo in
 `quick-start/` needs no update.
 
 ## Quick Update Script

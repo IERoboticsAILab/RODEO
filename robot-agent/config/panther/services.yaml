@@ -9,11 +9,13 @@ services:
     task_type: ItemTransport
     price_iec: 100
     summary: Picks up a package at one place and delivers it to another; the recipient confirms receipt
+    # default: used when a task does not give the parameter, e.g. a task posted
+    # with a free-text description from today's org-web form.
     params:
-      pickup:    {type: place,  label: Pick-up place}
-      dropoff:   {type: place,  label: Deliver to}
-      sender:    {type: text,   label: From}
-      recipient: {type: text,   label: Recipient (confirms receipt)}
+      pickup:    {type: place,  label: Pick-up place, default: package_pickup}
+      dropoff:   {type: place,  label: Deliver to,    default: package_dropoff}
+      sender:    {type: text,   label: From,          default: RODEO}
+      recipient: {type: text,   label: Recipient (confirms receipt), default: the recipient}
       declared_weight_kg: {type: number, label: Package weight (kg), optional: true}
     settings:
       wait_s: 60            # how long to wait at pick-up and drop-off

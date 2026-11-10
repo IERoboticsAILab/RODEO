@@ -4,6 +4,7 @@ import re
 def sanitize_bag_path(uri: str) -> str:
     if not isinstance(uri, str):
         return ""
+    uri = uri.split("#", 1)[0]          # drop a "#sha256=..." fragment (RODEO v2 proof URIs)
     if uri.startswith("file://"):
         return uri[len("file://"):]
     return uri

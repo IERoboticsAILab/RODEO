@@ -35,13 +35,19 @@ class ServiceDescription:
     version: int = 0
 
 
+def _param_json(p) -> dict:
+    d = {"type": p.type, "label": p.label, "optional": p.optional}
+    if p.default is not None:
+        d["default"] = p.default
+    return d
+
+
 def build_service_description(robot: RobotConfig, service: ServiceSpec) -> dict:
     d = {
         "v": FORMAT_VERSION,
         "robot": robot.robot,
         "summary": service.summary,
-        "params": {p.name: {"type": p.type, "label": p.label, "optional": p.optional}
-                   for p in service.params.values()},
+        "params": {p.name: _param_json(p) for p in service.params.values()},
         "settings": service.settings,
     }
     if service.place_params:
@@ -70,6 +76,17 @@ def parse_service_description(text: str | None) -> ServiceDescription:
         places=places if isinstance(places, dict) else {},
         settings=d.get("settings") if isinstance(d.get("settings"), dict) else {},
         structured=True, version=d["v"])
+
+
+def resolve_task_params(schema: ServiceDescription, params: dict) -> tuple:
+    """(params with schema defaults filled in, problems). Problems empty means valid."""
+    if not isinstance(params, dict):
+        return {}, ["parameters must be a JSON object"]
+    resolved = dict(params)
+    for name, spec in schema.params.items():
+        if resolved.get(name) in (None, "") and spec.get("default") is not None:
+            resolved[name] = spec["default"]
+    return resolved, validate_task_params(schema, resolved)
 
 
 def validate_task_params(schema: ServiceDescription, params: dict) -> list:

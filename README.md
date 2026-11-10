@@ -56,11 +56,11 @@ robotic_decentralized_organization/
 │   ├── ros2-eth-bridge/       # Bidirectional ROS 2 - Ethereum communication
 │   └── org-web/               # Web console for DAO management
 │
-├── robot-agent/               # RODEO robot standard: services.yaml, execute_task, proofs
+├── robot-agent/               # RODEO robot standard and the robot agent
 │
 ├── oracle/                    # Task verification oracle
 │
-├── quick-start/               # Robot emulator demo (ROS 2)
+├── quick-start/               # Demo without a robot: agent + fake executor
 │
 └── scripts/                   # update-addresses.sh
 ```
@@ -258,32 +258,27 @@ Connected: True
 
 ### Step 7: Run Integration Demo
 
-Execute the full workflow demonstration using Docker:
+Run a robot's RODEO software without a robot: the agent plus a fake executor
+that stands in for the robot (see [quick-start/README.md](quick-start/README.md)):
 
 ```bash
 cd quick-start/docker
 
-# First time (or after modifying the script):
-./robot-emulator.sh build
+# First time (or after code changes):
+./demo.sh build
 
-# Start the emulator:
-./robot-emulator.sh start
+# Start the agent and the fake executor:
+./demo.sh start
 
 # Follow the logs:
-./robot-emulator.sh logs
+./demo.sh logs
 ```
 
-On subsequent runs (service already registered on-chain), skip registration:
-
-```bash
-SKIP_REGISTRATION=true ./robot-emulator.sh start
-```
-
-The emulator uses the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
+Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 
 **The demo will**:
-1. Register a delivery service on the blockchain (check the web UI and you will see a new service being created)
-2. Use the organizaation web console to create a new task!
+1. Register the Panther's Delivery service on the blockchain (check the web UI and you will see the new service).
+2. Use the organization web console to create a new task!
 
    2.1 Navigate to the Tasks tab and create a new task with the following info:
    - Title: Package delivery
@@ -291,11 +286,11 @@ The emulator uses the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (defau
    - Category: Logistics
    - Task Type: ItemTransport
    - Reward: 100
-     
-   2.2 After creating the task on the web console you will notice that the task has been assigned to the robot wallet 
-4. On the robot emulator terminal you will notice that the robot recives the task assigment and starts the task execution.
-5. After task completition the robot submit a rosbag proof of completion
-6. On the oracle terminal you can notice that new proof has been recived and is being validated. This can take some time since the oracle is replaying the rosbag and validating different steps. In the end you will see a screen that says:
+
+   2.2 After creating the task you will notice that it has been assigned to the robot wallet.
+3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload, recipient confirmation.
+4. The agent hashes the proof and submits it.
+5. On the oracle terminal you can see the new proof being validated. This can take some time since the oracle replays the rosbag and validates different steps. In the end you will see:
 ```
 rodeo-oracle  | Validation summary
 rodeo-oracle  |   Base path: OK  total 10.956 m, min 0.100 m
@@ -310,22 +305,19 @@ rodeo-oracle  | Approved task 1
 rodeo-oracle  |
 rodeo-oracle  | Task 1 verified
 ```
-7. Next check the web console, in the home tab you can see that the payment is released to the robot.
+   (Until the oracle validates RODEO proofs, the demo submits the original waste-sorting bag; see `PROOF_MODE` in the quick-start README.)
+6. Next check the web console: in the home tab you can see that the payment is released to the robot.
 
 **Expected output** (abridged):
 ```
-RODEO Robot Emulator - Full Integration Demo (ROS 2)
-✅ Action servers connected!
-📝 Step 1: Registering delivery service...
-✅ Service registered! TX: 0x...  Block: 13
-✅ Robot ready - listening for task assignments
-🎯 Task assigned! ID: 1  Reward: 100.0 IEC
-🤖 Step 3: Executing task (10 seconds simulation)...
-✅ Task execution completed!
-📤 Step 4: Submitting proof of completion...
-✅ Proof submitted! TX: 0x...  Block: 15
-🔍 Step 5: Waiting for oracle validation...
-🏆 Task 1 verified — reward received!
+rodeo-demo-agent     | register service 'Delivery' (Logistics/ItemTransport, 100 IEC): ok (block 13)
+rodeo-demo-agent     | ready - waiting for assignments
+rodeo-demo-agent     | task 1 assigned (reward 100 IEC)
+rodeo-demo-agent     | task 1: executing Delivery with {"dropoff": "package_dropoff", "pickup": "package_pickup", ...}
+rodeo-demo-executor  | task 1: to_pickup - package_pickup
+rodeo-demo-executor  | task 1: waiting_confirm - the recipient takes the package and confirms
+rodeo-demo-agent     | task 1: submit proof: ok (block 15)
+rodeo-demo-agent     | task 1: VERIFIED - reward paid
 ```
 
 Monitor the oracle logs to see the validation process:

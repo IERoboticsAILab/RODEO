@@ -13,6 +13,7 @@ services.yaml - what one robot offers to RODEO.
           pickup:  {type: place, label: Pick-up place}
           dropoff: {type: place, label: Deliver to}
           declared_weight_kg: {type: number, label: Package weight (kg), optional: true}
+          sender:  {type: text, label: From, default: RODEO}   # default: used when the task omits it
         settings: {wait_s: 60}           # free-form, for the executor
     places:                              # shared by all services of this robot
       samuel_desk: {label: "Samuel's desk", waypoint: P, xy: [1.2, 3.4]}
@@ -44,6 +45,7 @@ class ParamSpec:
     type: str
     label: str
     optional: bool = False
+    default: object = None          # used when a task does not give this parameter
 
 
 @dataclass
@@ -147,14 +149,25 @@ def parse_robot_config(d: dict) -> RobotConfig:
                 raise ConfigError(f"{pwhere}: names use lowercase letters, digits and _")
             if not isinstance(ps, dict) or ps.get("type") not in PARAM_TYPES:
                 raise ConfigError(f"{pwhere}: 'type' must be one of {', '.join(PARAM_TYPES)}")
+            default = ps.get("default")
+            if default is not None:
+                ok = ((ps["type"] in ("place", "text") and isinstance(default, str)) or
+                      (ps["type"] == "number" and isinstance(default, (int, float))
+                       and not isinstance(default, bool)))
+                if not ok:
+                    raise ConfigError(f"{pwhere}: default {default!r} does not match type {ps['type']}")
             params[pname] = ParamSpec(name=pname, type=ps["type"],
                                       label=str(ps.get("label") or pname),
-                                      optional=bool(ps.get("optional", False)))
+                                      optional=bool(ps.get("optional", False)),
+                                      default=default)
         spec = ServiceSpec(name=name, category=category, task_type=task_type, price_iec=price,
                            summary=str(s.get("summary") or ""), params=params,
                            settings=dict(s.get("settings") or {}))
         if spec.place_params and not places:
             raise ConfigError(f"{where}: has place parameters but the robot has no 'places'")
+        for p in spec.params.values():
+            if p.type == "place" and p.default is not None and p.default not in places:
+                raise ConfigError(f"{where} param '{p.name}': default place '{p.default}' is not in places")
         services.append(spec)
 
     charging = d.get("charging") or {}

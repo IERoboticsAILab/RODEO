@@ -1,21 +1,39 @@
-# Robot emulator: acceptance test for the bridge (ROS 2).
-name: rodeo-robot-emulator
+# Demo without a robot: the RODEO agent plus a fake executor in place of the
+# robot. Uses the Panther's services.yaml (Delivery, nine places), so a task
+# runs exactly as it will on the Panther, minus the driving.
+name: rodeo-demo
+
+x-common: &common
+  build:
+    context: ../..
+    dockerfile: robot-agent/docker/Dockerfile
+  image: rodeo-robot-agent
+  network_mode: host
+  ipc: host
+  volumes:
+    - ${SERVICES_FILE:-../../robot-agent/config/panther/services.yaml}:/config/services.yaml:ro
+    - ../../oracle/proofs:/root/oracle/proofs
 
 services:
-  robot-emulator:
-    build:
-      context: ../..
-      dockerfile: quick-start/docker/Dockerfile
-    container_name: robot-emulator
-    network_mode: host
-    ipc: host
+  agent:
+    <<: *common
+    container_name: rodeo-demo-agent
+    command: ["agent"]
     environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}      # same as the bridge
-      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}    # same as the bridge
-      - SKIP_REGISTRATION=${SKIP_REGISTRATION:-false}
-      - PROOF_FILE=/root/oracle/proofs/task_tid10_20250910_145742.bag
-    volumes:
-      # same path the oracle container uses, so the file:// URI resolves there
-      - ../../oracle/proofs:/root/oracle/proofs:ro
-    # no auto-restart: every restart would register another service
-    restart: "no"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # same as the bridge
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}     # same as the bridge
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  fake-executor:
+    <<: *common
+    container_name: rodeo-demo-executor
+    command: ["fake-executor"]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      # legacy: also returns the ROS 1 waste-demo bag, which is the only proof
+      # today's oracle can validate. Switch to rodeo once the oracle reads
+      # RODEO proofs.
+      - PROOF_MODE=${PROOF_MODE:-legacy}
+    restart: unless-stopped

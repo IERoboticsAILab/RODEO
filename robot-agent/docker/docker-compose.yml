@@ -1,0 +1,24 @@
+# One robot's RODEO agent. Run it next to that robot's bridge, with the same
+# ROS_DOMAIN_ID and ROBOT_NAMESPACE.
+name: rodeo-agent
+
+services:
+  rodeo-agent:
+    build:
+      context: ../..
+      dockerfile: robot-agent/docker/Dockerfile
+    image: rodeo-robot-agent
+    container_name: rodeo-agent
+    network_mode: host
+    ipc: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      - RODEO_SERVICES_FILE=/config/services.yaml
+      - PROOF_DIR=/root/oracle/proofs
+    volumes:
+      - ${SERVICES_FILE:-../config/panther/services.yaml}:/config/services.yaml:ro
+      # proofs: written by the executor, hashed by the agent, read by the oracle
+      - ../../oracle/proofs:/root/oracle/proofs
+    stop_grace_period: 30s       # time to deactivate its services on docker stop
+    restart: unless-stopped

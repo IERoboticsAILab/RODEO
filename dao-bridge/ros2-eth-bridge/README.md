@@ -66,21 +66,21 @@ docker compose up -d --build
 docker logs -f ros2-eth-bridge  # expect "dao_listener ready" and "dao_writer ready"
 ```
 
-### Acceptance test: the ROS 2 robot emulator
+### Acceptance test: the demo
+
+The demo in `quick-start/` (the RODEO agent plus a fake executor) exercises
+every part of the bridge a robot uses:
 
 ```bash
 cd quick-start/docker
-./robot-emulator.sh build
-./robot-emulator.sh start
-./robot-emulator.sh logs
+./demo.sh build && ./demo.sh start && ./demo.sh logs
 ```
 
 Then create the task in org-web (Category `Logistics`, Task Type
-`ItemTransport`, Reward `100`). The run passes when the emulator logs
-`Task 1 verified — reward received!` and the oracle logs `APPROVED`.
-
-The emulator must use the bridge's `ROS_DOMAIN_ID` and `ROBOT_NAMESPACE`; both
-compose files default to domain 40 and no namespace.
+`ItemTransport`, Reward `100`). The run passes when the agent logs
+`task N: VERIFIED - reward paid` and the oracle logs `APPROVED`. The demo
+must use the bridge's `ROS_DOMAIN_ID` and `ROBOT_NAMESPACE`; all compose files
+default to domain 40 and no namespace.
 
 ## Run without Docker
 
