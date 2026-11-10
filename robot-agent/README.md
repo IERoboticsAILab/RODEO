@@ -26,8 +26,8 @@ A service may declare parameters of type `place`, `text` or `number`. Fixed
 services (TIAGo's tour, the drone patrol) declare none.
 
 Each place has a `label`, the executor's own `waypoint` name, and `xy`, its
-map-frame position, which the oracle checks poses against. For the Panther, `xy`
-is still null: copy it from `waypoints_captured.yaml`.
+map-frame position, which the oracle checks poses against. The Panther's come
+from the web app's `waypoints_captured.yaml`.
 
 ## 2. The service's on-chain description
 

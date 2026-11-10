@@ -19,18 +19,19 @@ services:
       wait_s: 60            # how long to wait at pick-up and drop-off
 
 # The places the web app's client page offers (webapp.py CLIENT_PLACES and LABELS).
-# xy: map-frame position the oracle checks poses against. Copy it from
-# waypoints_captured.yaml (the pose of that waypoint); null until then.
+# xy: map-frame position (m) the oracle checks poses against, from
+# waypoints_captured.yaml (captured 2026-10-08..26; G = mean of G1/G2, 1.6 cm apart).
+# Re-copy if the waypoints are re-captured or the map changes.
 places:
-  farah_desk:      {label: "Farah's desk",         waypoint: M,  xy: null}
-  saleh_desk:      {label: "Saleh's desk",         waypoint: N,  xy: null}
-  rodrigo_desk:    {label: "Rodrigo's desk",       waypoint: O,  xy: null}
-  samuel_desk:     {label: "Samuel's desk",        waypoint: P,  xy: null}
-  ee_server_room:  {label: "EE room / Server room", waypoint: G,  xy: null}
-  package_pickup:  {label: "Package pick up",      waypoint: H,  xy: null}
-  package_dropoff: {label: "Package drop off",     waypoint: K,  xy: null}
-  mech_room:       {label: "Mech room",            waypoint: C1, xy: null}
-  office:          {label: "Office",               waypoint: E1, xy: null}
+  farah_desk:      {label: "Farah's desk",         waypoint: M,  xy: [-5.656, -4.071]}
+  saleh_desk:      {label: "Saleh's desk",         waypoint: N,  xy: [-5.997, -12.509]}
+  rodrigo_desk:    {label: "Rodrigo's desk",       waypoint: O,  xy: [-5.783, -10.828]}
+  samuel_desk:     {label: "Samuel's desk",        waypoint: P,  xy: [-1.470, -1.322]}
+  ee_server_room:  {label: "EE room / Server room", waypoint: G,  xy: [1.885, -17.181]}
+  package_pickup:  {label: "Package pick up",      waypoint: H,  xy: [2.893, -24.206]}
+  package_dropoff: {label: "Package drop off",     waypoint: K,  xy: [-3.584, 13.735]}
+  mech_room:       {label: "Mech room",            waypoint: C1, xy: [1.879, -6.014]}
+  office:          {label: "Office",               waypoint: E1, xy: [1.849, -4.563]}
 
 charging:
   max_price_iec: 20         # the most the agent pays for one charging session

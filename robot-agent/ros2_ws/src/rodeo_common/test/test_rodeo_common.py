@@ -52,6 +52,7 @@ def test_panther_example_is_valid():
     assert svc is not None and svc.place_params == ["pickup", "dropoff"]
     assert cfg.places["samuel_desk"].waypoint == "P"
     assert cfg.service_for("Logistics", "Nope") is None
+    assert all(p.xy is not None for p in cfg.places.values()), "every Panther place needs xy"
 
 
 def test_wallet_gets_0x_prefix():
