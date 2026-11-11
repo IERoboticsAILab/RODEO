@@ -107,7 +107,7 @@ Organization task funds on the Home page.
 
 ## Next
 
-1. **Panther executor** in the web app repository (`~/panther-webapp-src`), Gazebo twin first,
+1. **Panther executor** in the web app (branch `webapp` of husarion-ugv-autonomy, at `~/panther-webapp-src`), Gazebo twin first,
    then the real robot. Its own `CLAUDE.md` (in that repo) has the plan; the
    RODEO side needs no change except running the bridge and agent on the web
    app's ROS domain (42 in sim, 41 on medusa) with `ROBOT_NAMESPACE=panther`
