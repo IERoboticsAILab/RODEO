@@ -14,6 +14,7 @@ from org_code import (
 )
 
 from catalog import build_catalog, find, task_description
+import wallet
 
 app = FastAPI(title="Organization Console API")
 
@@ -85,20 +86,57 @@ def catalog() -> List[Dict[str, Any]]:
     return build_catalog(list_all_services())
 
 
+def _checked_description(body: "TaskCreate") -> str:
+    """The task's description after the catalog checks (shared by both ways of posting)."""
+    if body.params is None:
+        return body.description
+    services = list_all_services()
+    entry = find(build_catalog(services), body.category, body.taskType)
+    if entry is None:
+        raise ValueError(f"no active service offers {body.category}/{body.taskType}")
+    if body.rewardIec < entry["minPriceIec"]:
+        raise ValueError(f"reward {body.rewardIec:g} IEC is below the lowest price "
+                         f"{entry['minPriceIec']:g} IEC: no provider would take it")
+    return task_description(services, body.category, body.taskType,
+                            body.params, body.description, body.title)
+
+
+@app.get("/wallet/config")
+def wallet_config() -> Dict[str, Any]:
+    """What the browser needs to connect MetaMask and post from the user's wallet (see wallet.py)."""
+    return wallet.config()
+
+
+@app.post("/tasks/prepare")
+def tasks_prepare(body: TaskCreate) -> Dict[str, Any]:
+    """Checks a task like /tasks/register, but returns it for the user's wallet to sign and pay."""
+    try:
+        description = _checked_description(body)
+        return {"description": description, "category": body.category, "taskType": body.taskType,
+                "rewardWei": str(Web3.to_wei(body.rewardIec, "ether")),
+                "taskManager": wallet.config()["taskManager"]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class FaucetRequest(BaseModel):
+    address: str
+
+
+@app.post("/faucet")
+def faucet(body: FaucetRequest) -> Dict[str, Any]:
+    """Local chain only: test ETH and IEC for a new wallet (see wallet.py)."""
+    try:
+        return wallet.faucet(body.address)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/tasks/register")
 def tasks_register(body: TaskCreate) -> Dict[str, str]:
+    """Posts a task paid by the Organization (the console's own wallet signs)."""
     try:
-        description = body.description
-        if body.params is not None:
-            services = list_all_services()
-            entry = find(build_catalog(services), body.category, body.taskType)
-            if entry is None:
-                raise ValueError(f"no active service offers {body.category}/{body.taskType}")
-            if body.rewardIec < entry["minPriceIec"]:
-                raise ValueError(f"reward {body.rewardIec:g} IEC is below the lowest price "
-                                 f"{entry['minPriceIec']:g} IEC: no provider would take it")
-            description = task_description(services, body.category, body.taskType,
-                                           body.params, body.description, body.title)
+        description = _checked_description(body)
         funds = task_funds_wei()
         if funds < Web3.to_wei(body.rewardIec, "ether"):
             raise ValueError(f"the organization has {funds / 10**18:g} IEC left for tasks, less than the "

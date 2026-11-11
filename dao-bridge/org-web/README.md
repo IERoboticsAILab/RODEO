@@ -187,6 +187,36 @@ opens a **details** section with only the fields that service declares, such as
 a delivery's pick-up and drop-off places. Fixed services, like a lab tour, have
 no details.
 
+## Wallets (MetaMask)
+
+Anyone can post tasks from their own wallet. **Connect wallet** (top right)
+uses MetaMask Connect EVM (`@metamask/connect-evm`, the successor of the
+deprecated `@metamask/sdk`) and shows the connected address and its IEC
+balance.
+
+1. **Connect wallet**, approve in MetaMask.
+2. **Switch to RODEO local** if MetaMask is on another network; the console
+   adds the network to MetaMask if needed (chain 1337, RPC `WALLET_RPC_URL`).
+3. On the local chain, **Get test funds** sends a new wallet some ETH (for gas)
+   and IEC from the organization's wallet (`/faucet`, once per address per 10
+   minutes; off on other chains).
+4. Post a task as usual. MetaMask asks twice: to let the TaskManager take the
+   reward into escrow, then to post the task. The backend still checks the task
+   (`/tasks/prepare`) and writes its description; the wallet signs and pays, so
+   it is the task's creator and receives the refund if the task is rejected.
+
+With a wallet connected, **My tasks** lists that wallet's tasks, and Remove /
+Activate are signed by it (the contract allows only a task's creator). Without
+a wallet, tasks are posted and paid by the organization, as before.
+
+Settings: `WALLET_RPC_URL` is the RPC URL as seen from the **browser**
+(`http://localhost:8545` on the PC; the server's address when org-web runs on
+medusa), `WALLET_CHAIN_NAME`, `DEV_FAUCET` (empty = on for chain 1337 only),
+`FAUCET_ETH`, `FAUCET_IEC`, `FAUCET_COOLDOWN_SEC`.
+
+Contract behaviour to know: removing a task does **not** refund its reward, and
+reactivating it takes the reward again; the console warns before removing.
+
 ### Organization task funds
 
 Tasks posted from the console are paid by the Organization contract from its
@@ -226,6 +256,9 @@ without `params` is posted as free text, as before.
 |--------|----------|-------------|
 | GET | `/contracts` | Contract addresses |
 | GET | `/catalog` | Kinds of service that can be ordered now, with schema and places |
+| GET | `/wallet/config` | Chain, wallet RPC URL, contract addresses, faucet on/off |
+| POST | `/tasks/prepare` | Check a task and return it for the user's wallet to sign and pay |
+| POST | `/faucet` | Local chain only: test ETH and IEC for a wallet |
 | GET | `/tasks` | List all tasks |
 | POST | `/tasks/register` | Create new task |
 | POST | `/tasks/activate` | Enable task assignment |

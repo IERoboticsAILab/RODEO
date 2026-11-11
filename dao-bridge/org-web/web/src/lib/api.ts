@@ -1,5 +1,5 @@
 import { formatUnitsString  } from "./units";
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api"
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api"
 
 
 async function j<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
@@ -65,15 +65,16 @@ export const api = {
   //const [mine, all] = await Promise.all([api.tasks.byCreator(), api.tasks.all()]);
   //return { mine, all };
 //};
+const mapTask = (t: any) => ({
+  ...t,
+  // always provide a token string
+  rewardToken: t.rewardIec != null
+    ? String(t.rewardIec)
+    : formatUnitsString(t.rewardWei, 18, 4),
+});
+
 export const fetchTasks = async () => {
   const [mineRaw, allRaw] = await Promise.all([api.tasks.byCreator(), api.tasks.all()]);
-  const mapTask = (t: any) => ({
-    ...t,
-    // always provide a token string
-    rewardToken: t.rewardIec != null
-      ? String(t.rewardIec)
-      : formatUnitsString(t.rewardWei, 18, 4),
-  });
   return { mine: mineRaw.map(mapTask), all: allRaw.map(mapTask) };
 };
 
@@ -81,6 +82,15 @@ export const createTask = (body: { description: string; category: string; taskTy
                                    params?: Record<string, string | number> }) =>
   api.tasks.register(body);
 export const fetchCatalog = () => api.catalog();
+
+// a task checked by the backend, to be signed and paid by the user's wallet
+export const prepareTask = (body: { title: string; description: string; category: string; taskType: string;
+                                    rewardIec: number; params: Record<string, string | number> }) =>
+  j<import("./wallet").PreparedTask>(fetch(`${API_BASE}/tasks/prepare`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+
+export const fetchTasksByCreator = async (addr: string) =>
+  (await api.tasks.byCreator(addr)).map(mapTask);
 
 export type OrgFunds = { taskFundsIec: number; walletIec: number; balanceIec: number };
 export const fetchOrgFunds = () => j<OrgFunds>(fetch(`${API_BASE}/organization/balance`));

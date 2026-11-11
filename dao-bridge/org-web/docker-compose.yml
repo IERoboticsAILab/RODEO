@@ -15,6 +15,12 @@ services:
     environment:
       # Blockchain Configuration
       - RPC_URL=${RPC_URL:-http://localhost:8545}
+
+      # Wallets (MetaMask): the RPC URL as seen from the user's browser, and the
+      # local-chain faucet (on by default on chain 1337 only)
+      - WALLET_RPC_URL=${WALLET_RPC_URL:-http://localhost:8545}
+      - WALLET_CHAIN_NAME=${WALLET_CHAIN_NAME:-RODEO local}
+      - DEV_FAUCET=${DEV_FAUCET:-}
       
       # Contract Addresses
       - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
