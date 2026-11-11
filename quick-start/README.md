@@ -60,8 +60,8 @@ in org-web (`http://localhost:8080`, Tasks tab):
 4. Click **Create task**.
 
 The organization pays for the tasks it posts from its deposit, shown as
-**Task funds** on the same page. Deployment deposits 1000 IEC (ten 100 IEC
-tasks); when it runs low, deposit more there.
+**Organization task funds** on the Home page. Deployment deposits 1000 IEC (ten
+100 IEC tasks); when it runs low, deposit more there.
 
 The run succeeds when the agent logs `task N: VERIFIED - reward paid`. After
 the second task, it logs `charging (battery at 20 %)`, then

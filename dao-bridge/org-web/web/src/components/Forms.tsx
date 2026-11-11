@@ -199,7 +199,10 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
   );
 }
 
-/** Funds the organization can still put into tasks, and a deposit box. */
+/**
+ * Funds the Organization contract can still put into the tasks it posts from
+ * this console, and a deposit from the organization's wallet. (Home page.)
+ */
 export function TaskFunds({ funds, onDeposit }: {
   funds: { taskFundsIec: number; walletIec: number } | undefined;
   onDeposit: (amountIec: number) => Promise<void>;
@@ -218,7 +221,7 @@ export function TaskFunds({ funds, onDeposit }: {
   return (
     <form onSubmit={deposit} className="flex flex-wrap items-end gap-3">
       <div className="text-sm">
-        <div><span className="font-semibold">Task funds:</span> {funds.taskFundsIec} IEC available</div>
+        <div><span className="font-semibold">{funds.taskFundsIec} IEC</span> available for tasks</div>
         <div className="text-xs opacity-70">organization wallet: {funds.walletIec} IEC</div>
       </div>
       <div className="space-y-1">

@@ -187,10 +187,10 @@ opens a **details** section with only the fields that service declares, such as
 a delivery's pick-up and drop-off places. Fixed services, like a lab tour, have
 no details.
 
-### Task funds
+### Organization task funds
 
 Tasks posted from the console are paid by the Organization contract from its
-deposit, shown as **Task funds** on the Tasks page with a deposit box
+deposit, shown as **Organization task funds** on the Home page with a deposit box
 (`GET /organization/balance`, `POST /organization/deposit`). The deposit first
 approves the Organization contract, then deposits. A task is refused with a
 clear message when the funds don't cover its price.

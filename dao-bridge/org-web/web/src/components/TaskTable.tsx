@@ -1,6 +1,11 @@
 import { Task } from "../lib/types";
 import { formatUnitsString } from "../lib/units";
-import { taskDetails, taskTitle } from "../lib/describe";
+import { describeTask } from "../lib/describe";
+
+// 0x8464135c8F25Da09e49BC8782676a84730C318bC -> 0x8464…18bC (full address on hover)
+function shortAddr(a: string): string {
+  return a && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
 
 // allow extra fields produced by the fetch wrapper
 type TaskRow = Task & { rewardToken?: string | number; rewardIec?: string | number; rewardWei?: string | number };
@@ -37,12 +42,11 @@ export default function TaskTable({
   onAction,
 }: { rows: TaskRow[]; onAction?: (id: number, action: "remove" | "activate") => void }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-x-auto">
       <table className="table">
         <thead>
           <tr className="tr bg-gray-50 dark:bg-neutral-900">
             <th className="th">ID</th>
-            <th className="th">Title</th>
             <th className="th">Reward</th>
             <th className="th">Category</th>
             <th className="th">Type</th>
@@ -70,15 +74,14 @@ export default function TaskTable({
             return (
               <tr key={row.id} className="tr">
                 <td className="td">{row.id}</td>
-                <td className="td">{taskTitle((row as any).description ?? "")}</td>
-                <td className="td">{token} IEC</td> {/* show token value */}
+                <td className="td whitespace-nowrap">{token} IEC</td> {/* show token value */}
                 <td className="td">{row.taskCategory}</td>
                 <td className="td">{row.taskType}</td>
-                <td className="td max-w-[18rem] truncate" title={taskDetails((row as any).description ?? "")}>
-                  {taskDetails((row as any).description ?? "")}
+                <td className="td max-w-[16rem] truncate" title={describeTask((row as any).description ?? "")}>
+                  {describeTask((row as any).description ?? "")}
                 </td>
-                <td className="td">{row.creator}</td>
-                <td className="td">{row.executor}</td>
+                <td className="td font-mono text-xs whitespace-nowrap" title={row.creator}>{shortAddr(row.creator)}</td>
+                <td className="td font-mono text-xs whitespace-nowrap" title={row.executor}>{shortAddr(row.executor)}</td>
                 <td className="td"><span className="badge" style={badgeStyle(STATUS_BG[row.status] ?? "#e5e7eb")}>{statusLabel(row.status)}</span></td>
                 <td className="td">
                   <span className="badge" style={badgeStyle(row.active ? YES_BG : NO_BG)}>{row.active ? "Yes" : "No"}</span>

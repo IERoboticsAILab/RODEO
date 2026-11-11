@@ -102,7 +102,7 @@ def tasks_register(body: TaskCreate) -> Dict[str, str]:
         funds = task_funds_wei()
         if funds < Web3.to_wei(body.rewardIec, "ether"):
             raise ValueError(f"the organization has {funds / 10**18:g} IEC left for tasks, less than the "
-                             f"{body.rewardIec:g} IEC reward: deposit more IEC (Tasks page, Task funds)")
+                             f"{body.rewardIec:g} IEC reward: deposit more IEC (Home page, Organization task funds)")
         tx = register_task(description, body.category, body.taskType, body.rewardIec)
         return {"txHash": tx}
     except Exception as e:

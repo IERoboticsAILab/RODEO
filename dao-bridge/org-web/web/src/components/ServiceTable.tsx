@@ -1,6 +1,11 @@
 import { Service } from "../lib/types";
 import { formatUnitsString } from "../lib/units";
 
+// 0x8464135c8F25Da09e49BC8782676a84730C318bC -> 0x8464…18bC (full address on hover)
+function shortAddr(a: string): string {
+  return a && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+
 type ServiceRow = Service & {
   // optional normalized fields added by fetch wrappers
   priceToken?: string | number;
@@ -34,7 +39,7 @@ export default function ServiceTable({
   onAction?: (id: number, action: "remove" | "activate" | "busy-on" | "busy-off") => void;
 }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-x-auto">
       <table className="table">
         <thead>
           <tr className="tr bg-gray-50 dark:bg-neutral-900">
@@ -43,7 +48,7 @@ export default function ServiceTable({
             <th className="th">Price</th>
             <th className="th">Category</th>
             <th className="th">Type</th>
-            <th className="th w-[15rem]">Owner</th>
+            <th className="th">Owner</th>
             <th className="th w-20 text-center">Active</th>
             <th className="th w-2 text-center">Status</th>
             <th className="th !text-center w-[16rem]">Actions</th>
@@ -62,7 +67,9 @@ export default function ServiceTable({
                 <td className="td">{priceLabel(row)} IEC</td>
                 <td className="td">{row.serviceCategory ?? ""}</td>
                 <td className="td">{row.serviceType}</td>
-                <td className="td">{row.owner ?? row.creator}</td>
+                <td className="td font-mono text-xs whitespace-nowrap" title={row.owner ?? row.creator}>
+                  {shortAddr(row.owner ?? row.creator)}
+                </td>
                 <td className="td">
                   <span className="badge" style={badgeStyle(row.active ? YES_BG : NO_BG)}>{row.active ? "Yes" : "No"}</span>
                 </td>

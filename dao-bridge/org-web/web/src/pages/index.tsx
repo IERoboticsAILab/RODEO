@@ -5,10 +5,18 @@ import useSWR from "swr";
 import { fetchAll,  deleteService, deleteTask, activateService, activateTask, setServiceBusy, fetchTokenHolders } from "../lib/api";
 import ServiceTable from "../components/ServiceTable";
 import TaskTable from "../components/TaskTable";
+import { TaskFunds } from "../components/Forms";
+import { fetchOrgFunds, depositOrgFunds } from "../lib/api";
 
 export default function Home() {
   const { data, mutate } = useSWR("overview", fetchAll, { refreshInterval: 3000 });
   const { data: tokenData } = useSWR("tokenHolders", fetchTokenHolders, { refreshInterval: 10000 });
+  const { data: funds, mutate: mutateFunds } = useSWR("orgFunds", fetchOrgFunds, { refreshInterval: 5000 });
+
+  async function handleDeposit(amountIec: number) {
+    await depositOrgFunds(amountIec);
+    await mutateFunds();
+  }
   const taskCount = data?.allTasks?.length ?? 0;
   const serviceCount = data?.allServices?.length ?? 0;
   
@@ -69,6 +77,12 @@ const symbol = tokenData?.token?.symbol ?? "IEC";
           <Link href="/services" className="btn focus-ring">Manage services</Link>
         </div>
       </div>
+    </div>
+
+    {/* What the organization can still put into the tasks it posts from this console */}
+    <div className="card p-4 mt-4">
+      <h2 className="text-lg font-semibold mb-2">Organization task funds</h2>
+      <TaskFunds funds={funds} onDeposit={handleDeposit} />
     </div>
   </div>
 
