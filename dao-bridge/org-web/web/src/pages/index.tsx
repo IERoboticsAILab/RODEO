@@ -6,6 +6,7 @@ import { fetchAll,  deleteService, deleteTask, activateService, activateTask, se
 import ServiceTable from "../components/ServiceTable";
 import TaskTable from "../components/TaskTable";
 import { TaskFunds } from "../components/Forms";
+import AdminBox from "../components/AdminBox";
 import { fetchOrgFunds, depositOrgFunds } from "../lib/api";
 
 export default function Home() {
@@ -79,10 +80,12 @@ const symbol = tokenData?.token?.symbol ?? "IEC";
       </div>
     </div>
 
-    {/* What the organization can still put into the tasks it posts from this console */}
+    {/* The organization's own wallet: admin only (ORG_ADMIN_PIN) */}
     <div className="card p-4 mt-4">
-      <h2 className="text-lg font-semibold mb-2">Organization task funds</h2>
-      <TaskFunds funds={funds} onDeposit={handleDeposit} />
+      <h2 className="text-lg font-semibold mb-2">Organization (admin)</h2>
+      <AdminBox>
+        <TaskFunds funds={funds} onDeposit={handleDeposit} />
+      </AdminBox>
     </div>
   </div>
 

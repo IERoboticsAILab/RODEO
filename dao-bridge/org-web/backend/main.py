@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
@@ -15,6 +15,28 @@ from org_code import (
 
 from catalog import build_catalog, find, task_description
 import wallet
+
+import hmac
+import os
+import time
+
+# ---------- Admin: who may make the console sign with the organization's key ----------
+# ORG_ADMIN_PIN unset: the organization's wallet cannot be used from the console
+# at all (people post with their own wallets). Set: requests that sign with the
+# organization's key need the PIN in the X-Admin-Pin header.
+ADMIN_PIN = os.environ.get("ORG_ADMIN_PIN", "")
+
+
+def require_admin(x_admin_pin: Optional[str] = Header(default=None)) -> None:
+    if not ADMIN_PIN:
+        raise HTTPException(status_code=403, detail="the organization's wallet is not available on this "
+                                                    "console (ORG_ADMIN_PIN is not set): connect a wallet")
+    if not x_admin_pin or not hmac.compare_digest(x_admin_pin, ADMIN_PIN):
+        time.sleep(1.0)                       # slow down guessing
+        raise HTTPException(status_code=401, detail="admin PIN required for the organization's wallet")
+
+
+ADMIN = [Depends(require_admin)]
 
 app = FastAPI(title="Organization Console API")
 
@@ -101,6 +123,18 @@ def _checked_description(body: "TaskCreate") -> str:
                             body.params, body.description, body.title)
 
 
+@app.get("/admin/status")
+def admin_status() -> Dict[str, bool]:
+    """Whether an admin PIN is configured (the organization's wallet can be used at all)."""
+    return {"enabled": bool(ADMIN_PIN)}
+
+
+@app.post("/admin/check", dependencies=ADMIN)
+def admin_check() -> Dict[str, bool]:
+    """200 if the X-Admin-Pin header is right; used by the page to unlock admin controls."""
+    return {"ok": True}
+
+
 @app.get("/wallet/config")
 def wallet_config() -> Dict[str, Any]:
     """What the browser needs to connect MetaMask and post from the user's wallet (see wallet.py)."""
@@ -132,7 +166,7 @@ def faucet(body: FaucetRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/tasks/register")
+@app.post("/tasks/register", dependencies=ADMIN)
 def tasks_register(body: TaskCreate) -> Dict[str, str]:
     """Posts a task paid by the Organization (the console's own wallet signs)."""
     try:
@@ -146,28 +180,28 @@ def tasks_register(body: TaskCreate) -> Dict[str, str]:
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/remove")
+@app.post("/tasks/remove", dependencies=ADMIN)
 def tasks_remove(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": remove_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/activate")
+@app.post("/tasks/activate", dependencies=ADMIN)
 def tasks_activate(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": activate_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/unassign")
+@app.post("/tasks/unassign", dependencies=ADMIN)
 def tasks_unassign(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": unassign_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/submit-proof")
+@app.post("/tasks/submit-proof", dependencies=ADMIN)
 def tasks_submit_proof(body: Proof) -> Dict[str, str]:
     try:
         return {"txHash": submit_proof_as_executor(body.taskId, body.proofURI)}
@@ -186,28 +220,28 @@ def services_by_creator(creator: str = ORG_CONTRACT_ADDR) -> List[Dict[str, Any]
 
 # ---------- Service writes ----------
 
-@app.post("/services/register")
+@app.post("/services/register", dependencies=ADMIN)
 def services_register(body: ServiceCreate) -> Dict[str, str]:
     try:
         return {"txHash": register_service(body.name, body.description, body.category, body.serviceType, body.priceIec)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/remove")
+@app.post("/services/remove", dependencies=ADMIN)
 def services_remove(body: ServiceId) -> Dict[str, str]:
     try:
         return {"txHash": remove_service(body.serviceId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/activate")
+@app.post("/services/activate", dependencies=ADMIN)
 def services_activate(body: ServiceId) -> Dict[str, str]:
     try:
         return {"txHash": activate_service(body.serviceId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/set-busy")
+@app.post("/services/set-busy", dependencies=ADMIN)
 def services_set_busy(body: Busy) -> Dict[str, str]:
     try:
         return {"txHash": set_service_busy(body.index, body.isBusy)}
@@ -258,7 +292,7 @@ def organization_balance() -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/organization/deposit")
+@app.post("/organization/deposit", dependencies=ADMIN)
 def organization_deposit(body: DepositAmount) -> Dict[str, str]:
     """Deposit IEC tokens into Organization contract for task funding"""
     try:

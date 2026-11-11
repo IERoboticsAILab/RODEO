@@ -284,7 +284,7 @@ Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 1. Register the Panther's Delivery service on the blockchain (check the web UI and you will see the new service).
 2. Use the organization web console to create a new task!
 
-   2.1 Navigate to the Tasks tab, give the task a Name, choose Category **Logistics** and Type **ItemTransport (Delivery)** (only services that are online are listed; the price fills in), choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. When the organization's task funds run low, deposit more on the Home page (**Organization task funds**).
+   2.1 Connect MetaMask (top right; on the local chain, **Get test funds** gives a new wallet IEC and gas), or unlock the admin on the Home page with the PIN from `dao-bridge/org-web/.env.admin` to post as the organization. Then navigate to the Tasks tab, give the task a Name, choose Category **Logistics** and Type **ItemTransport (Delivery)** (only services that are online are listed; the price fills in), choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. When the organization pays and its task funds run low, deposit more on the Home page (**Organization (admin)**).
 
    2.2 After creating the task you will notice that it has been assigned to the robot wallet.
 3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload, recipient confirmation.

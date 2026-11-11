@@ -24,3 +24,6 @@ oracle/proofs/task[0-9]*_*/
 
 # oracle state (hashes of used proofs)
 oracle/state/
+
+# org-web admin PIN (see dao-bridge/org-web/.env.admin.example)
+dao-bridge/org-web/.env.admin

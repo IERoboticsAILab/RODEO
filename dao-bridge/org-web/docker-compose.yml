@@ -12,6 +12,11 @@ services:
     extra_hosts:
       # reach Ganache published on the host (required on Linux)
       - "host.docker.internal:host-gateway"
+    # Admin PIN (ORG_ADMIN_PIN) lives in .env.admin, which is not committed;
+    # without it the organization's wallet can't be used from the console.
+    env_file:
+      - path: .env.admin
+        required: false
     environment:
       # Blockchain Configuration
       - RPC_URL=${RPC_URL:-http://localhost:8545}

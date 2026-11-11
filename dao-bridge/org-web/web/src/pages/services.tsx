@@ -5,8 +5,10 @@ import { CreateServiceForm } from "../components/Forms";
 import ServiceTable from "../components/ServiceTable";
 import { createService, deleteService, fetchServices, activateService, setServiceBusy } from "../lib/api";
 import useSWR from "swr";
+import { useAdmin } from "../lib/admin";
 
 export default function ServicesPage() {
+  const admin = useAdmin();
   const { data, mutate } = useSWR("services", fetchServices, { refreshInterval: 3000 });
 
   const [name, setName] = useState("");
@@ -55,6 +57,19 @@ export default function ServicesPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Services</h1>
       </div>
       <div className="grid grid-cols-1 gap-4">
+        {!admin.unlocked ? (
+          <>
+            <p className="text-sm opacity-70">
+              Robots register their services through their own agents. Registering or managing services
+              for the organization needs the admin PIN (Home page).
+            </p>
+            <section className="space-y-2">
+              <h2 className="font-semibold">All services</h2>
+              <ServiceTable rows={data?.all ?? []} />
+            </section>
+          </>
+        ) : (
+        <>
         <div className="card p-4">
           <CreateServiceForm
             onCreate={handleCreate}
@@ -75,6 +90,8 @@ export default function ServicesPage() {
             <h2 className="font-semibold">Created by this organization</h2>
             <ServiceTable rows={data?.mine ?? []} onAction={handleAction} />
           </section>
+        </>
+        )}
         </div>
     </Shell>
   );

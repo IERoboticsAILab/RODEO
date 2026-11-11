@@ -51,7 +51,7 @@ export default function ServiceTable({
             <th className="th">Owner</th>
             <th className="th w-20 text-center">Active</th>
             <th className="th w-2 text-center">Status</th>
-            <th className="th !text-center w-[16rem]">Actions</th>
+            {onAction ? <th className="th !text-center w-[16rem]">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -76,22 +76,18 @@ export default function ServiceTable({
                 <td className="td">
                   <span className="badge" style={badgeStyle(row.busy ? NO_BG : YES_BG)}>{row.busy ? "Busy" : "Free"}</span>
                 </td>
-                <td className="td min-w-[12rem]">
-                  <div className="flex justify-center gap-2">
-                    <button
-                      className="btn focus-ring"
-                      onClick={() => onAction && onAction(row.id, busyAction)}
-                    >
-                      {busyLabel}
-                    </button>
-                    <button
-                      className="btn focus-ring"
-                      onClick={() => onAction && onAction(row.id, activeAction)}
-                    >
-                      {activeLabel}
-                    </button>
-                  </div>
-                </td>
+                {onAction ? (
+                  <td className="td min-w-[12rem]">
+                    <div className="flex justify-center gap-2">
+                      <button className="btn focus-ring" onClick={() => onAction(row.id, busyAction)}>
+                        {busyLabel}
+                      </button>
+                      <button className="btn focus-ring" onClick={() => onAction(row.id, activeAction)}>
+                        {activeLabel}
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             );
           })}

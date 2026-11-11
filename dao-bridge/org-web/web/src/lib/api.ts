@@ -1,6 +1,28 @@
 import { formatUnitsString  } from "./units";
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api"
 
+// Admin PIN (unlocks the organization's wallet; see lib/admin.tsx). Kept for this
+// browser tab only and sent with every request; the backend decides where it is needed.
+const ADMIN_PIN_KEY = "rodeo-admin-pin";
+export function getAdminPin(): string {
+  if (typeof window === "undefined") return "";
+  try { return window.sessionStorage.getItem(ADMIN_PIN_KEY) || ""; } catch { return ""; }
+}
+export function setAdminPin(pin: string): void {
+  try {
+    if (pin) window.sessionStorage.setItem(ADMIN_PIN_KEY, pin);
+    else window.sessionStorage.removeItem(ADMIN_PIN_KEY);
+  } catch { /* storage unavailable: admin stays locked */ }
+}
+function jsonHeaders(): Record<string, string> {
+  const pin = getAdminPin();
+  return pin ? { "Content-Type": "application/json", "X-Admin-Pin": pin } : { "Content-Type": "application/json" };
+}
+export const fetchAdminStatus = () => j<{ enabled: boolean }>(fetch(`${API_BASE}/admin/status`));
+export const checkAdminPin = (pin: string) =>
+  j<{ ok: boolean }>(fetch(`${API_BASE}/admin/check`, {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Pin": pin }, body: "{}" }));
+
 
 async function j<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
   const res = await resOrPromise; // accept Promise<Response> and await it
@@ -29,16 +51,16 @@ export const api = {
     register: (body: { description: string; category: string; taskType: string; rewardIec: number;
                        params?: Record<string, string | number> }) =>
       j<{ txHash: string }>(
-        fetch(`${API_BASE}/tasks/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        fetch(`${API_BASE}/tasks/register`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) })
       ),
     activate: (taskId: number) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/activate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/activate`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ taskId }) })),
     remove: (taskId: number) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/remove`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/remove`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ taskId }) })),
     unassign: (taskId: number) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/unassign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/unassign`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ taskId }) })),
     submitProof: (taskId: number, proofURI: string) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/submit-proof`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId, proofURI }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/tasks/submit-proof`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ taskId, proofURI }) })),
   },
 
   services: {
@@ -49,14 +71,14 @@ export const api = {
       ),
     register: (body: { name: string; description: string; category: string; serviceType: string; priceIec: number }) =>
       j<{ txHash: string }>(
-        fetch(`${API_BASE}/services/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        fetch(`${API_BASE}/services/register`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) })
       ),
     activate: (serviceId: number) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/services/activate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ serviceId }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/services/activate`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ serviceId }) })),
     remove: (serviceId: number) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/services/remove`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ serviceId }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/services/remove`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ serviceId }) })),
     setBusy: (index: number, isBusy: boolean) =>
-      j<{ txHash: string }>(fetch(`${API_BASE}/services/set-busy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ index, isBusy }) })),
+      j<{ txHash: string }>(fetch(`${API_BASE}/services/set-busy`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ index, isBusy }) })),
   },
 }
 
@@ -87,7 +109,7 @@ export const fetchCatalog = () => api.catalog();
 export const prepareTask = (body: { title: string; description: string; category: string; taskType: string;
                                     rewardIec: number; params: Record<string, string | number> }) =>
   j<import("./wallet").PreparedTask>(fetch(`${API_BASE}/tasks/prepare`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+    method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) }));
 
 export const fetchTasksByCreator = async (addr: string) =>
   (await api.tasks.byCreator(addr)).map(mapTask);
@@ -96,7 +118,7 @@ export type OrgFunds = { taskFundsIec: number; walletIec: number; balanceIec: nu
 export const fetchOrgFunds = () => j<OrgFunds>(fetch(`${API_BASE}/organization/balance`));
 export const depositOrgFunds = (amountIec: number) =>
   j<{ txHash: string }>(fetch(`${API_BASE}/organization/deposit`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountIec }) }));
+    method: "POST", headers: jsonHeaders(), body: JSON.stringify({ amountIec }) }));
 export const deleteTask = (id: number) => api.tasks.remove(id);
 export const activateTask = (id: number) => api.tasks.activate(id);
 

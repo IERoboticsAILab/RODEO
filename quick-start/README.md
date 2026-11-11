@@ -49,6 +49,11 @@ The agent logs `register service 'Delivery' ...: ok` (or reuses the service
 it registered before) and then `ready - waiting for assignments`. Create a task
 in org-web (`http://localhost:8080`, Tasks tab):
 
+Posting needs either **MetaMask** (Connect MetaMask, top right; on the local
+chain, Get test funds gives a new wallet IEC and gas) or the **admin PIN**
+(`dao-bridge/org-web/.env.admin`, unlocked on the Home page), in which case the
+organization pays.
+
 1. Give the task a **Name**, and a **Description** if you like.
 2. Choose **Category** `Logistics`, then **Type** `ItemTransport (Delivery)`.
    The dropdowns list only services that are online, so they fill once the
@@ -59,9 +64,9 @@ in org-web (`http://localhost:8080`, Tasks tab):
    sender, recipient and package weight.
 4. Click **Create task**.
 
-The organization pays for the tasks it posts from its deposit, shown as
-**Organization task funds** on the Home page. Deployment deposits 1000 IEC (ten
-100 IEC tasks); when it runs low, deposit more there.
+When the organization pays, it does so from its deposit, shown under
+**Organization (admin)** on the Home page once unlocked. Deployment deposits
+1000 IEC (ten 100 IEC tasks); when it runs low, deposit more there.
 
 The run succeeds when the agent logs `task N: VERIFIED - reward paid`. After
 the second task, it logs `charging (battery at 20 %)`, then

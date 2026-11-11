@@ -189,12 +189,13 @@ no details.
 
 ## Wallets (MetaMask)
 
-Anyone can post tasks from their own wallet. **Connect wallet** (top right)
+Anyone can post tasks from their own wallet. **Connect MetaMask** (top right)
 uses MetaMask Connect EVM (`@metamask/connect-evm`, the successor of the
 deprecated `@metamask/sdk`) and shows the connected address and its IEC
 balance.
 
-1. **Connect wallet**, approve in MetaMask.
+1. **Connect MetaMask**, approve in MetaMask. (To show MetaMask's icon on the
+   button, add their official `metamask.svg` to `web/public/`.)
 2. **Switch to RODEO local** if MetaMask is on another network; the console
    adds the network to MetaMask if needed (chain 1337, RPC `WALLET_RPC_URL`).
 3. On the local chain, **Get test funds** sends a new wallet some ETH (for gas)
@@ -206,8 +207,28 @@ balance.
    it is the task's creator and receives the refund if the task is rejected.
 
 With a wallet connected, **My tasks** lists that wallet's tasks, and Remove /
-Activate are signed by it (the contract allows only a task's creator). Without
-a wallet, tasks are posted and paid by the organization, as before.
+Activate are signed by it (the contract allows only a task's creator).
+
+## Admin: the organization's wallet
+
+The console holds the organization's key, so using it is admin-only. Without
+an admin PIN the console is wallet-only: people post with MetaMask, and every
+request that would sign with the organization's key is refused.
+
+To allow an admin: copy `.env.admin.example` to `.env.admin` (not committed),
+set `ORG_ADMIN_PIN`, and restart org-web. Then **Unlock** with the PIN on the
+Home page (Organization (admin)); it lasts for that browser tab. Unlocked:
+
+- the task form offers **Pay from: my wallet / the organization**;
+- the organization's task funds and deposit box appear on the Home page;
+- the Services page can register and manage the organization's services, and
+  the Tasks page lists the organization's tasks with their actions.
+
+The backend enforces it: the ten endpoints that sign with the organization's key
+require the PIN in the `X-Admin-Pin` header (a wrong PIN is answered after a
+second's delay). Reading, `/tasks/prepare` and the local-chain faucet stay open.
+Over the lab network, serve the console over HTTPS so the PIN isn't sent in the
+clear.
 
 Settings: `WALLET_RPC_URL` is the RPC URL as seen from the **browser**
 (`http://localhost:8545` on the PC; the server's address when org-web runs on
@@ -256,6 +277,8 @@ without `params` is posted as free text, as before.
 |--------|----------|-------------|
 | GET | `/contracts` | Contract addresses |
 | GET | `/catalog` | Kinds of service that can be ordered now, with schema and places |
+| GET | `/admin/status` | Whether an admin PIN is configured |
+| POST | `/admin/check` | 200 if the `X-Admin-Pin` header is right |
 | GET | `/wallet/config` | Chain, wallet RPC URL, contract addresses, faucet on/off |
 | POST | `/tasks/prepare` | Check a task and return it for the user's wallet to sign and pay |
 | POST | `/faucet` | Local chain only: test ETH and IEC for a wallet |
