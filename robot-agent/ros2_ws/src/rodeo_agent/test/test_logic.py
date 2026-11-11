@@ -70,9 +70,10 @@ def test_free_text_task_uses_defaults():
 
 def test_structured_task():
     d = encode_task_description({"pickup": "farah_desk", "dropoff": "samuel_desk",
-                                 "recipient": "Samuel"}, "fragile")
+                                 "recipient": "Samuel"}, "fragile", title="Parcel for Samuel")
     prep, why = prepare_task(CFG, task(desc=d))
     assert why is None and prep.params["dropoff"] == "samuel_desk" and prep.note == "fragile"
+    assert prep.title == "Parcel for Samuel"
 
 
 def test_bad_tasks_rejected_with_reason():

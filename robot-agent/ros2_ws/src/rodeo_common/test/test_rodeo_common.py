@@ -148,3 +148,12 @@ def test_bad_defaults_rejected():
     d = base_cfg(); d["services"][0]["params"]["w"]["default"] = "heavy"
     with pytest.raises(ConfigError, match="does not match type"):
         parse_robot_config(d)
+
+
+def test_title_roundtrip_and_backward_compatible():
+    s = encode_task_description({"pickup": "a"}, "fragile", title="Parcel for Samuel")
+    d = parse_task_description(s)
+    assert d.title == "Parcel for Samuel" and d.params == {"pickup": "a"} and d.note == "fragile"
+    assert "title" not in encode_task_description({}, "n")            # empty title left out
+    assert parse_task_description('{"v":1,"params":{},"note":"n"}').title == ""
+    assert parse_task_description("free text").title == ""

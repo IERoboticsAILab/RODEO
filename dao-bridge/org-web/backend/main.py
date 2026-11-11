@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 class TaskCreate(BaseModel):
+    title: str = ""                             # the task's name (stored in the description)
     description: str = ""                       # free text; with params it is the task's note
     category: str
     taskType: str
@@ -97,7 +98,7 @@ def tasks_register(body: TaskCreate) -> Dict[str, str]:
                 raise ValueError(f"reward {body.rewardIec:g} IEC is below the lowest price "
                                  f"{entry['minPriceIec']:g} IEC: no provider would take it")
             description = task_description(services, body.category, body.taskType,
-                                           body.params, body.description)
+                                           body.params, body.description, body.title)
         tx = register_task(description, body.category, body.taskType, body.rewardIec)
         return {"txHash": tx}
     except Exception as e:

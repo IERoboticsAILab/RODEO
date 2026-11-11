@@ -101,6 +101,7 @@ class PreparedTask:
     spec: ServiceSpec
     params: dict
     note: str
+    title: str = ""
 
 
 def prepare_task(cfg: RobotConfig, task) -> tuple:
@@ -113,7 +114,7 @@ def prepare_task(cfg: RobotConfig, task) -> tuple:
     params, errors = resolve_task_params(schema, desc.params)
     if errors:
         return None, "invalid task parameters: " + "; ".join(errors)
-    return PreparedTask(int(task.id), spec, params, desc.note), None
+    return PreparedTask(int(task.id), spec, params, desc.note, desc.title), None
 
 
 def tasks_to_recover(tasks: list, wallet: str) -> tuple:

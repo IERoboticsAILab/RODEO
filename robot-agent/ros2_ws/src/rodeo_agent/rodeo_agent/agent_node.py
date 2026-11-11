@@ -335,7 +335,8 @@ class RodeoAgent(Node):
                                 params_json=json.dumps(prepared.params, sort_keys=True),
                                 note=prepared.note, executor=self.cfg.wallet, robot=self.cfg.robot,
                                 proof_dir=self.proof_dir)
-        self.log.info(f"task {task_id}: executing {prepared.spec.name} with {goal.params_json}")
+        name = f" '{prepared.title}'" if prepared.title else ""
+        self.log.info(f"task {task_id}{name}: executing {prepared.spec.name} with {goal.params_json}")
         t0 = time.monotonic()
 
         def feedback(fb):

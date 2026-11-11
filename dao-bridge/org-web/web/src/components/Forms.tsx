@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { CatalogEntry, ParamSpec } from "../lib/types";
 
 export type TaskRequest = {
+  title: string;                                // the task's name
   category: string;
   taskType: string;
   rewardIec: number;
   description: string;                          // free-text note
-  params?: Record<string, string | number>;     // only for services with a parameter schema
+  params: Record<string, string | number>;      // service details ({} if the service has none)
 };
 
 type TaskFormProps = {
@@ -17,8 +18,9 @@ type TaskFormProps = {
 };
 
 function availability(e: CatalogEntry): string {
-  if (e.free > 0) return `${e.free} of ${e.providers} free`;
-  return `all ${e.providers} busy - will queue`;
+  const who = e.robot ? ` · offered by ${e.robot}` : "";
+  if (e.free > 0) return `${e.free} of ${e.providers} free · from ${e.minPriceIec} IEC${who}`;
+  return `all ${e.providers} busy, the task will queue · from ${e.minPriceIec} IEC${who}`;
 }
 
 function defaultsFor(e: CatalogEntry | undefined): Record<string, string> {
@@ -59,15 +61,19 @@ function ParamField({ name, spec, entry, value, onChange }: {
 }
 
 /**
- * Task form driven by the services that are online (GET /catalog): pick a
- * service, fill its parameters (places are dropdowns), add a note, and post.
- * Offline services do not appear; busy ones are marked "will queue".
+ * Task form, the same for every service:
+ *   base     Service (from the services that are online), Category and Type
+ *            (set by the service), Title, Description, Reward
+ *   details  only the fields the chosen service declares (e.g. a delivery's
+ *            pick-up and drop-off places); fixed services have none
+ * Offline services do not appear; busy ones are marked as queueing.
  */
 export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
   const [key, setKey] = useState("");
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [reward, setReward] = useState(0);
+  const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,7 +85,7 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
     if (!catalog.some(e => e.key === key)) setKey(catalog[0].key);
   }, [catalog, key]);
 
-  // new service: its defaults, and the reward that gets the task picked up now
+  // another service: its defaults, and the reward that gets the task picked up now
   useEffect(() => {
     setValues(defaultsFor(entry));
     setReward(entry ? (entry.free > 0 ? entry.pickPriceIec : entry.minPriceIec) : 0);
@@ -88,28 +94,26 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
 
   if (!catalog) return <p className="text-sm opacity-70">Loading services...</p>;
   if (catalog.length === 0) {
-    return <p className="text-sm opacity-70">No service is online. Tasks can be posted once a robot or station has registered a service.</p>;
+    return <p className="text-sm opacity-70">No service is online. Tasks can be posted once a robot has registered a service.</p>;
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!entry) return;
-    let params: Record<string, string | number> | undefined;
-    if (entry.structured) {
-      params = {};
-      for (const [name, spec] of Object.entries(entry.params)) {
-        const v = values[name] ?? "";
-        if (v === "") continue;                       // optional, left empty
-        params[name] = spec.type === "number" ? Number(v) : v;
-      }
+    const params: Record<string, string | number> = {};
+    for (const [name, spec] of Object.entries(entry.params)) {
+      const v = values[name] ?? "";
+      if (v === "") continue;                         // optional, left empty
+      params[name] = spec.type === "number" ? Number(v) : v;
     }
     setBusy(true);
     setError("");
     try {
-      await onCreate({ category: entry.category, taskType: entry.taskType, rewardIec: reward,
-                       description: note, params });
-      setValues(defaultsFor(entry));
+      await onCreate({ title: title.trim(), category: entry.category, taskType: entry.taskType,
+                       rewardIec: reward, description: note, params });
+      setTitle("");
       setNote("");
+      setValues(defaultsFor(entry));
     } catch (err: any) {
       setError(err?.message || String(err));
     } finally {
@@ -119,22 +123,42 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
 
   const paramNames = entry ? Object.keys(entry.params) : [];
   return (
-    <form onSubmit={submit} className="space-y-3">
+    <form onSubmit={submit} className="space-y-4">
+      {/* ---------------- base: the same for every service */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-        <div className="space-y-1 md:col-span-5">
+        <div className="space-y-1 md:col-span-6">
           <label className="label">Service</label>
           <select className="input focus-ring" value={key} onChange={e => setKey(e.target.value)}>
             {catalog.map(e => (
-              <option key={e.key} value={e.key}>
-                {e.name} ({e.category}/{e.taskType}) - from {e.minPriceIec} IEC, {availability(e)}
-              </option>
+              <option key={e.key} value={e.key}>{e.name}</option>
             ))}
           </select>
         </div>
-        <div className="space-y-1 md:col-span-5">
-          <label className="label">Note</label>
+        <div className="space-y-1 md:col-span-3">
+          <label className="label">Category</label>
+          <input className="input" value={entry?.category ?? ""} readOnly tabIndex={-1} />
+        </div>
+        <div className="space-y-1 md:col-span-3">
+          <label className="label">Type</label>
+          <input className="input" value={entry?.taskType ?? ""} readOnly tabIndex={-1} />
+        </div>
+      </div>
+      {entry ? (
+        <p className="text-xs opacity-70 -mt-2">
+          {entry.summary ? `${entry.summary} · ` : ""}{availability(entry)}
+        </p>
+      ) : null}
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div className="space-y-1 md:col-span-4">
+          <label className="label">Title</label>
+          <input className="input focus-ring" value={title} onChange={e => setTitle(e.target.value)} required
+                 placeholder="a short name for the task" />
+        </div>
+        <div className="space-y-1 md:col-span-6">
+          <label className="label">Description</label>
           <input className="input focus-ring" value={note} onChange={e => setNote(e.target.value)}
-                 placeholder="anything the robot or recipient should know" />
+                 placeholder="anything the robot or the people involved should know" />
         </div>
         <div className="space-y-1 md:col-span-2">
           <label className="label">Reward (IEC)</label>
@@ -143,15 +167,17 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
         </div>
       </div>
 
-      {entry?.summary ? <p className="text-sm opacity-70">{entry.summary}</p> : null}
-
+      {/* ---------------- details: only what the chosen service declares */}
       {paramNames.length > 0 && entry ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {paramNames.map(name => (
-            <ParamField key={name} name={name} spec={entry.params[name]} entry={entry}
-                        value={values[name] ?? ""} onChange={v => setValues({ ...values, [name]: v })} />
-          ))}
-        </div>
+        <fieldset className="border rounded-md p-3 space-y-2">
+          <legend className="px-1 text-sm font-semibold">{entry.name} details</legend>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {paramNames.map(name => (
+              <ParamField key={name} name={name} spec={entry.params[name]} entry={entry}
+                          value={values[name] ?? ""} onChange={v => setValues({ ...values, [name]: v })} />
+            ))}
+          </div>
+        </fieldset>
       ) : null}
 
       <div className="flex items-center gap-3">

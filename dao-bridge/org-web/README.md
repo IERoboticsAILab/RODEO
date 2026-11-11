@@ -180,6 +180,12 @@ docker run -d \
 
 ## The task form
 
+Every task has the same base, whatever the service: **Service** (Category and
+Type are set by it), **Title**, **Description** and **Reward**. Below that, a
+**details** section shows only the fields the chosen service declares, such as a
+delivery's pick-up and drop-off places; fixed services, like a lab tour, have
+none.
+
 The Tasks page is built from `GET /catalog`, which lists one entry per kind of
 service (category and task type) that an **active** service offers:
 
@@ -195,8 +201,9 @@ service (category and task type) that an **active** service offers:
 
 The backend checks the parameters against the same schema (with
 `rodeo_common`, shared with the robot agents and the oracle) and writes the
-task description as `{"v":1,"params":{...},"note":"..."}`. A request without
-`params` is posted as free text, as before.
+task description as `{"v":1,"title":"...","params":{...},"note":"..."}`; the
+contract has no field for a title, so it lives in the description. A request
+without `params` is posted as free text, as before.
 
 ## API Endpoints
 

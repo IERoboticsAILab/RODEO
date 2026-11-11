@@ -54,9 +54,13 @@ is about 1 KB.
 Org-web writes each task's `description` as (`rodeo_common/description.py`):
 
 ```json
-{"v": 1, "params": {"pickup": "package_pickup", "dropoff": "samuel_desk",
-                    "sender": "Farah", "recipient": "Samuel"}, "note": "fragile"}
+{"v": 1, "title": "Parcel for Samuel",
+ "params": {"pickup": "package_pickup", "dropoff": "samuel_desk",
+            "sender": "Farah", "recipient": "Samuel"}, "note": "fragile"}
 ```
+
+Every task has the same base (title, note, and the contract's category, task
+type and reward); `params` holds the service-specific details.
 
 `validate_task_params()` checks it against the service's schema. Anything that
 isn't this JSON (every task created so far) parses as a free-text note with no

@@ -1,6 +1,6 @@
 import { Task } from "../lib/types";
 import { formatUnitsString } from "../lib/units";
-import { describeTask } from "../lib/describe";
+import { taskDetails, taskTitle } from "../lib/describe";
 
 // allow extra fields produced by the fetch wrapper
 type TaskRow = Task & { rewardToken?: string | number; rewardIec?: string | number; rewardWei?: string | number };
@@ -42,6 +42,7 @@ export default function TaskTable({
         <thead>
           <tr className="tr bg-gray-50 dark:bg-neutral-900">
             <th className="th">ID</th>
+            <th className="th">Title</th>
             <th className="th">Reward</th>
             <th className="th">Category</th>
             <th className="th">Type</th>
@@ -69,11 +70,12 @@ export default function TaskTable({
             return (
               <tr key={row.id} className="tr">
                 <td className="td">{row.id}</td>
+                <td className="td">{taskTitle((row as any).description ?? "")}</td>
                 <td className="td">{token} IEC</td> {/* show token value */}
                 <td className="td">{row.taskCategory}</td>
                 <td className="td">{row.taskType}</td>
-                <td className="td max-w-[18rem] truncate" title={describeTask((row as any).description ?? "")}>
-                  {describeTask((row as any).description ?? "")}
+                <td className="td max-w-[18rem] truncate" title={taskDetails((row as any).description ?? "")}>
+                  {taskDetails((row as any).description ?? "")}
                 </td>
                 <td className="td">{row.creator}</td>
                 <td className="td">{row.executor}</td>

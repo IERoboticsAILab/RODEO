@@ -77,12 +77,14 @@ def find(catalog: list, category: str, task_type: str):
     return None
 
 
-def task_description(services: list, category: str, task_type: str, params, note: str) -> str:
+def task_description(services: list, category: str, task_type: str, params, note: str,
+                     title: str = "") -> str:
     """
     The description to post for a task. Without ``params`` it is the note as
-    free text (the old form). With ``params`` they are checked against the
-    schema of the service the contract would pick, and written in the RODEO
-    convention; raises ValueError with the problems otherwise.
+    free text (the old form). With ``params`` (``{}`` for a service without
+    details) they are checked against the schema of the service the contract
+    would pick, and written in the RODEO convention with the title and note;
+    raises ValueError with the problems otherwise.
     """
     if params is None:
         return note
@@ -96,7 +98,7 @@ def task_description(services: list, category: str, task_type: str, params, note
             raise ValueError("; ".join(errors))
     elif params:
         raise ValueError(f"{category}/{task_type} takes no parameters")
-    return encode_task_description(params, note)
+    return encode_task_description(params, note, title.strip())
 
 
 def _pick(services, category, task_type):

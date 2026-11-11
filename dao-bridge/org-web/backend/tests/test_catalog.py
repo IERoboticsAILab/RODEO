@@ -41,8 +41,9 @@ def test_busy_only_kind_still_listed():
 
 def test_task_description():
     rows = [svc(1)]
-    out = json.loads(task_description(rows, "Logistics", "ItemTransport", {"dropoff": "b"}, "fragile"))
-    assert out == {"v": 1, "params": {"dropoff": "b"}, "note": "fragile"}
+    out = json.loads(task_description(rows, "Logistics", "ItemTransport", {"dropoff": "b"}, "fragile",
+                                      title="  Parcel for B "))
+    assert out == {"v": 1, "title": "Parcel for B", "params": {"dropoff": "b"}, "note": "fragile"}
     assert task_description(rows, "Logistics", "ItemTransport", None, "free text") == "free text"
     with pytest.raises(ValueError, match="unknown place 'zz'"):
         task_description(rows, "Logistics", "ItemTransport", {"dropoff": "zz"}, "")
