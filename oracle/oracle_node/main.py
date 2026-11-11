@@ -20,12 +20,16 @@ def main():
                 "on_verified": controller.on_verified,
                 "on_rejected": controller.on_rejected},
         daemon=True)
-    thread.start()
+    if settings.watch:
+        thread.start()
+    else:
+        print("Console only (ORACLE_WATCH=0): not watching the chain")
     try:
         controller.run_menu()
     finally:
         watcher.stop()
-        thread.join(timeout=2)
+        if thread.is_alive():
+            thread.join(timeout=2)
 
 
 if __name__ == "__main__":

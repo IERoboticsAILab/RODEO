@@ -4,7 +4,7 @@ This directory contains the Docker configuration for running the RODEO Oracle No
 
 ## Overview
 
-The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. It is plain Python (no ROS): proofs, including legacy ROS 1 .bag files, are read with the `rosbags` library.
+The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. By default it runs the ROS 2 oracle (oracle and validator nodes, `Dockerfile`); a pure-Python oracle with the same checks is available as the `oracle-python` service (`--profile python`, `Dockerfile.python`).
 
 ## Prerequisites
 
@@ -89,16 +89,18 @@ Watching oracle requests and outcomes...
 
 ### 3. Interact with the Oracle
 
-Attach to the running container for interactive menu:
+Open the interactive menu next to the running ROS 2 oracle (no second chain watcher):
 
 ```bash
-docker attach rodeo-oracle
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
+
+With the Python oracle (`--profile python`), attach to it: `docker attach rodeo-oracle-python`.
 
 Or execute commands directly:
 
 ```bash
-docker exec -it rodeo-oracle python3 -m oracle_node.main
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
 
 ### 5. Stop the Oracle

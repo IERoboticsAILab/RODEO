@@ -25,6 +25,8 @@ class Settings:
         # Validation
         self.clock_tolerance_s = float(os.environ.get("CLOCK_TOLERANCE_SEC", "5"))
         self.state_dir = os.environ.get("STATE_DIR", str(Path(__file__).parent.parent / "state"))
+        # ORACLE_WATCH=0: console only, no chain watcher (e.g. next to the ROS 2 oracle)
+        self.watch = os.environ.get("ORACLE_WATCH", "1") not in ("0", "false", "no")
         self.legacy_proofs = os.environ.get("LEGACY_PROOFS", "1") not in ("0", "false", "no")
         self.interactive = os.environ.get("ORACLE_INTERACTIVE", "1") not in ("0", "false", "no")
         self.iec_per_kwh = float(os.environ.get("IEC_PER_KWH", "1.0"))

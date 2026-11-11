@@ -11,6 +11,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TaskEvent.msg"
   "msg/PayloadWeight.msg"
   "action/ExecuteTask.action"
+  "srv/ValidateProof.srv"
   DEPENDENCIES builtin_interfaces action_msgs
 )
 

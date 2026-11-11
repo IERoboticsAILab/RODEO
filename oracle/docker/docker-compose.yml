@@ -1,61 +1,64 @@
+# Two oracles with the same checks and the same chain/wallet settings:
+#   oracle         ROS 2 (default): oracle node + validator nodes (ValidateProof services)
+#   oracle-python  pure Python, no ROS: docker compose --profile python up -d oracle-python
+# Run one of them at a time: both act as the same oracle wallet.
+
+x-oracle-env: &oracle_env
+  - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # ROS 2 oracle only
+  # Blockchain connection
+  - RPC_URL=${RPC_URL:-http://localhost:8545}
+  # Smart contract addresses and oracle wallet (from .env)
+  - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
+  - TASK_MANAGER_ADDRESS=${TASK_MANAGER_ADDRESS}
+  - SERVICE_MANAGER_ADDRESS=${SERVICE_MANAGER_ADDRESS}
+  - IECOIN_ADDRESS=${IECOIN_ADDRESS}
+  - ORACLE_ADDRESS=${ORACLE_ADDRESS}
+  - ORACLE_PRIVATE_KEY=${ORACLE_PRIVATE_KEY}
+  # Paths
+  - ADDRESSES_JSON=/workspace/addresses.json
+  - BASE_ABI=/workspace/abi
+  - TASK_MANAGER_NAME=TaskManager
+  # Gas
+  - MIN_GAS_PRICE=1000000000
+  - GAS_MULTIPLIER=1.2
+  # Validation
+  - CLOCK_TOLERANCE_SEC=${CLOCK_TOLERANCE_SEC:-5}
+  - LEGACY_PROOFS=${LEGACY_PROOFS:-1}        # 0: refuse ROS 1 .bag / .csv proofs
+  - STATE_DIR=/workspace/state               # hashes of proofs already used
+  - POS_EPS=0.002                            # waste-demo validator (legacy ROS 1 bags)
+  - IEC_PER_KWH=1.0                          # energy CSV validator (legacy)
+  - IEC_DECIMALS=18
+
+x-oracle: &oracle
+  network_mode: host
+  env_file:
+    - .env
+  environment: *oracle_env
+  volumes:
+    # Contract ABIs (the ROS 2 bridge's copies)
+    - ../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
+    # Proofs: /root/oracle/proofs is the path the robot agent and executors use
+    - ../proofs:/workspace/proofs:ro
+    - ../proofs:/root/oracle/proofs:ro
+    # Proofs already used, kept across restarts (local only, not committed)
+    - ../state:/workspace/state
+  stdin_open: true
+  tty: true
+  restart: unless-stopped
+
 services:
   oracle:
+    <<: *oracle
+    container_name: rodeo-oracle
     build:
       context: ../..
       dockerfile: oracle/docker/Dockerfile
-    container_name: rodeo-oracle
-    network_mode: host
-    env_file:
-      - .env
-    environment:
-      # Blockchain connection
-      - RPC_URL=${RPC_URL:-http://localhost:8545}
-      
-      # Smart Contract Addresses (loaded from .env)
-      - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
-      - TASK_MANAGER_ADDRESS=${TASK_MANAGER_ADDRESS}
-      - SERVICE_MANAGER_ADDRESS=${SERVICE_MANAGER_ADDRESS}
-      - IECOIN_ADDRESS=${IECOIN_ADDRESS}
-      
-      # Oracle Wallet (loaded from .env)
-      - ORACLE_ADDRESS=${ORACLE_ADDRESS}
-      - ORACLE_PRIVATE_KEY=${ORACLE_PRIVATE_KEY}
-      
-      # Configuration paths
-      - ADDRESSES_JSON=/workspace/addresses.json
-      - BASE_ABI=/workspace/abi
-      - TASK_MANAGER_NAME=TaskManager
-      
-      # Gas settings
-      - MIN_GAS_PRICE=1000000000
-      - GAS_MULTIPLIER=1.2
-      # - GAS_PRICE_OVERRIDE=2000000000
-      
-      # Validation
-      - CLOCK_TOLERANCE_SEC=${CLOCK_TOLERANCE_SEC:-5}
-      - LEGACY_PROOFS=${LEGACY_PROOFS:-1}        # 0: refuse ROS 1 .bag / .csv proofs
-      - STATE_DIR=/workspace/state               # hashes of proofs already used
-      # Waste-demo validator (legacy ROS 1 bags)
-      - POS_EPS=0.002
-      # Energy calculation (legacy CSV proofs)
-      - IEC_PER_KWH=1.0
-      - IEC_DECIMALS=18
-    volumes:
-      # Mount ABI files
-      - ../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
-      
-      # Also mount to /workspace/proofs for convenience
-      - ../proofs:/workspace/proofs:ro
+    ipc: host                                  # ROS 2 shared memory between containers
 
-      # Mount to /root/oracle/proofs: the path the robot agent and executors use for
-      # proofs (robot-agent and quick-start compose files mount the same folder there)
-      - ../proofs:/root/oracle/proofs:ro
-      
-      # Proofs already used, kept across restarts (local only, not committed)
-      - ../state:/workspace/state
-
-      # Optional: Mount addresses file if you want to modify it
-      # - ../addresses.json:/workspace/addresses.json
-    stdin_open: true
-    tty: true
-    restart: unless-stopped
+  oracle-python:
+    <<: *oracle
+    profiles: ["python"]
+    container_name: rodeo-oracle-python
+    build:
+      context: ../..
+      dockerfile: oracle/docker/Dockerfile.python

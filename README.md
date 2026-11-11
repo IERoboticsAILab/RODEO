@@ -190,11 +190,13 @@ contracts:
 
 ### Step 4: Start Oracle Node
 
-The oracle validates task completion proofs:
+The oracle validates task completion proofs. It runs as ROS 2 nodes (the oracle
+plus one validator node per service type); a pure-Python oracle with the same
+checks is also available (`--profile python`, see [oracle/README.md](oracle/README.md)):
 
 ```bash
 cd oracle/docker
-docker compose up -d
+docker compose up -d --build
 
 # Verify oracle is running
 docker logs rodeo-oracle --tail 20
@@ -202,7 +204,9 @@ docker logs rodeo-oracle --tail 20
 
 **Expected output**:
 ```
+[delivery_validator]: delivery validator ready (Logistics/ItemTransport)
 ✅ Oracle configuration loaded from environment variables
+[oracle]: validator Logistics/ItemTransport -> /oracle/validate/delivery
 Starting event watcher from block 0 (current: X)
 Watching oracle requests and outcomes
 ```
@@ -292,7 +296,7 @@ Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 4. The agent hashes the proof and submits it.
 5. On the oracle terminal you can see the new proof being validated: first the checks every proof must pass (hash, reuse, manifest, parameters, time window), then the delivery validator. In the end you will see:
 ```
-rodeo-oracle  | Validation summary
+rodeo-oracle  | task 1 validation summary
 rodeo-oracle  |   OK    proof hash matches the URI
 rodeo-oracle  |   OK    proof not used before
 rodeo-oracle  |   OK    manifest task id 1

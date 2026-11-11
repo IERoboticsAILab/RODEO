@@ -12,8 +12,26 @@ The Oracle serves as an independent verification layer in the RODEO system:
 4. **Updates Blockchain** - Sends `oracleFulfill` to the TaskManager contract
 5. **Triggers Payments** - Approved tasks release the escrowed reward to the robot
 
-It is plain Python: proofs are read with the `rosbags` library, so neither ROS 1
-nor ROS 2 is installed and no bag is replayed.
+### Two implementations, one behaviour
+
+| | ROS 2 oracle (default) | Python oracle (alternative) |
+|---|---|---|
+| Where | `ros2_ws/src/rodeo_oracle`, compose service `oracle` | `oracle_node/`, compose service `oracle-python` (profile `python`) |
+| Validators | ROS 2 nodes serving `rodeo_interfaces/srv/ValidateProof`, in any language (C++ or Python), free to use any ROS library | Python functions registered in `oracle_node/validators/` |
+| Reads proofs with | `rosbag2` | `rosbags` (no ROS install) |
+| Verdicts | logged, and published as JSON on `/oracle/verdicts` | logged |
+| Console | none (runs unattended; see Interactive Mode) | `docker attach` menu |
+
+Both share the chain client, the shared checks and the delivery rules
+(`oracle_node/`), so they give the same verdict for the same proof. Run one at
+a time: both sign as the same oracle wallet.
+
+The ROS 2 oracle runs two nodes in the `/oracle` namespace: `oracle` (chain,
+shared checks, verdicts) and `delivery_validator` (serves
+`/oracle/validate/delivery`). The oracle's `validators` parameter maps a
+service kind to a validator service, e.g.
+`Logistics/ItemTransport=validate/delivery`. A RODEO proof for a kind with no
+validator, or whose validator node is not running, is rejected.
 
 ### Checks on every RODEO proof
 
@@ -31,16 +49,20 @@ service's validator runs:
 
 ### Validators
 
-Chosen by the task's category and task type (`oracle_node/validators/`):
+Chosen by the task's category and task type. The rules live in
+`oracle_node/validators/`; in the ROS 2 oracle each runs inside a validator node:
 
 | Service | Validator | Checks |
 |---|---|---|
 | Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`, declared weight if given); receipt confirmed at drop-off by the named recipient |
 
-A new service gets a validator by adding a module with
-`@register("Category", "TaskType")` and importing it in
-`validators/__init__.py`. A RODEO proof for a service without a validator is
-rejected.
+A new service gets a validator by:
+
+- **ROS 2 oracle:** a node (any language) serving `ValidateProof` under the
+  oracle's namespace, started from `launch/oracle.launch.py` and listed in the
+  `validators` parameter. `rodeo_oracle/delivery_validator.py` is the template.
+- **Python oracle:** a module with `@register("Category", "TaskType")`, imported
+  in `validators/__init__.py`.
 
 ### Legacy proofs
 
@@ -190,11 +212,15 @@ timestamp,watts
 
 ## Interactive Mode
 
-Attach to running oracle for interactive control:
+The ROS 2 oracle runs unattended. For the menu (inbox, manual approve or
+reject, re-validate), start the Python console inside its container without a
+second chain watcher:
 
 ```bash
-docker attach rodeo-oracle
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
+
+With the Python oracle, attach to it instead: `docker attach rodeo-oracle-python`.
 
 **Menu options:**
 ```
@@ -217,8 +243,8 @@ To detach without stopping: `Ctrl+P` then `Ctrl+Q`
 ### Manual Approval (if needed)
 
 ```bash
-# Attach to oracle
-docker attach rodeo-oracle
+# Open the console (ROS 2 oracle; with the Python oracle: docker attach rodeo-oracle-python)
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 
 # Select option 2 (Approve task)
 # Enter task ID when prompted
@@ -250,12 +276,13 @@ python -m oracle_node.main
 
 ```
 oracle/
-├── docker/                    # Docker deployment (python:3.11-slim, no ROS)
+├── docker/                    # Dockerfile (ROS 2, default), Dockerfile.python, one compose file
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── .env.example           # Configuration template
 │   └── oracle-docker.sh       # Helper script
-├── oracle_node/               # Oracle Python package
+├── ros2_ws/src/rodeo_oracle/  # ROS 2 oracle: oracle node, delivery_validator node, launch
+├── oracle_node/               # Python oracle and the logic both oracles share
 │   ├── main.py                # Entry point
 │   ├── settings.py            # Configuration from the environment
 │   ├── chain.py               # Contract access, task time windows, service descriptions

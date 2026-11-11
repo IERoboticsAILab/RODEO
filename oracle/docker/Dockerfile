@@ -1,23 +1,39 @@
-# RODEO oracle v2: plain Python. Proofs are read with `rosbags`, so neither ROS 1
-# nor ROS 2 is installed. Build context: repo root.
-FROM python:3.11-slim
+# RODEO oracle, ROS 2 (default). The oracle and its validator nodes run as ROS 2
+# nodes; validators serve rodeo_interfaces/srv/ValidateProof and can be written
+# in any language. Build context: repo root. (Pure-Python alternative:
+# Dockerfile.python, compose profile "python".)
+FROM ros:humble-ros-base
 
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1
+SHELL ["/bin/bash", "-c"]
 
-COPY oracle/docker/requirements.txt /tmp/requirements.txt
-RUN pip install -r /tmp/requirements.txt && \
-    pip install --no-deps eth-account==0.13.7 && \
-    pip install "setuptools<70"            # web3 6.x imports pkg_resources
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-humble-rosbag2-py ros-humble-rosbag2-storage-mcap \
+      python3-pip python3-yaml python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
 
-# Shared RODEO conventions (task descriptions, service schema, proof URIs)
-COPY robot-agent/ros2_ws/src/rodeo_common /tmp/rodeo_common
-RUN pip install --no-deps /tmp/rodeo_common && rm -rf /tmp/rodeo_common
+# Chain access (same set as the bridge) and rosbags for legacy ROS 1 bags.
+# numpy stays < 2: ROS 2 Humble's message modules are built against numpy 1.
+RUN pip3 install --no-cache-dir web3==6.11.4 websockets==13.1 rosbags==0.11.9 "numpy<2" && \
+    pip3 install --no-cache-dir --no-deps eth-account==0.13.7
 
+WORKDIR /ros2_ws
+COPY robot-agent/ros2_ws/src/rodeo_interfaces ./src/rodeo_interfaces
+COPY robot-agent/ros2_ws/src/rodeo_common ./src/rodeo_common
+COPY oracle/ros2_ws/src/rodeo_oracle ./src/rodeo_oracle
+RUN source /opt/ros/humble/setup.bash && colcon build && rm -rf build log
+
+# Shared oracle logic (chain client, checks, validator rules), also used by the
+# pure-Python oracle
 WORKDIR /workspace
 COPY oracle/oracle_node/ /workspace/oracle_node/
 COPY oracle/addresses.json /workspace/addresses.json
 RUN mkdir -p /workspace/abi /workspace/state
-
 ENV PYTHONPATH=/workspace
-CMD ["python3", "-m", "oracle_node.main"]
+
+COPY oracle/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+RUN echo 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash' >> /root/.bashrc
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "rodeo_oracle", "oracle.launch.py"]

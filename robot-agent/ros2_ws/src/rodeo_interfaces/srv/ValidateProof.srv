@@ -1,0 +1,15 @@
+# Served by an oracle validator node, one per (category, task type), e.g.
+# /oracle/validate/delivery. The oracle calls it after the shared checks
+# (hash, reuse, manifest, parameters, time window) have passed. Validators may
+# be written in any language; they read the proof bag at proof_path themselves.
+uint64 task_id
+string category
+string task_type
+string executor               # wallet address of the robot that did the task
+string params_json            # task parameters (service defaults filled in)
+string service_description    # the service's on-chain description (JSON: params, places)
+string proof_path             # absolute path of the proof bag
+---
+bool ok
+string reason                 # on-chain rejection reason when ok is false (<= 128 chars)
+string[] lines                # human-readable summary, one check per line
