@@ -11,6 +11,8 @@ Web-based management interface for RODEO blockchain operations. Provides real-ti
 ## Features
 
 ### Task Management
+- Order a task from the services that are online: pick a service, fill in its
+  parameters (places are dropdowns), add a note
 - Register new tasks with reward allocation
 - Activate/deactivate tasks
 - Monitor task assignment and execution
@@ -148,7 +150,8 @@ If not using environment variables, create `backend/addresses.json`:
 ### Build
 
 ```bash
-docker build -t org-web-console:latest .
+# from the repo root (the image includes robot-agent's rodeo_common)
+docker build -f dao-bridge/org-web/Dockerfile -t org-web-console:latest .
 ```
 
 ### Run with Environment Variables
@@ -175,11 +178,32 @@ docker run -d \
   org-web-console:latest
 ```
 
+## The task form
+
+The Tasks page is built from `GET /catalog`, which lists one entry per kind of
+service (category and task type) that an **active** service offers:
+
+- offline (inactive) services do not appear;
+- if every provider of a kind is busy, it is listed as "will queue": the task
+  waits on chain until one is free;
+- the parameters and places come from the on-chain description of the service
+  the contract would pick (the cheapest free one), so the form always matches
+  the robot that will do the task. Defaults are pre-filled;
+- services marked `robot_only` (charging) are left out: robots order those;
+- the reward is pre-filled with the price that gets the task picked up now. A
+  robot is paid its service price; anything above it stays in the contract.
+
+The backend checks the parameters against the same schema (with
+`rodeo_common`, shared with the robot agents and the oracle) and writes the
+task description as `{"v":1,"params":{...},"note":"..."}`. A request without
+`params` is posted as free text, as before.
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/contracts` | Contract addresses |
+| GET | `/catalog` | Kinds of service that can be ordered now, with schema and places |
 | GET | `/tasks` | List all tasks |
 | POST | `/tasks/register` | Create new task |
 | POST | `/tasks/activate` | Enable task assignment |
@@ -212,6 +236,9 @@ export ORGANIZATION_ADDRESS=0x...
 
 uvicorn main:app --reload --port 8000
 ```
+
+From a source checkout, `rodeo_common` is found in `robot-agent/` automatically.
+Tests: `python -m pytest tests`.
 
 Backend runs on `http://localhost:8000`
 

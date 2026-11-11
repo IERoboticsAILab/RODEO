@@ -1,4 +1,4 @@
 fastapi
 uvicorn[standard]
 pydantic
-web3==7.12.0
+web3==7.12.0pyyaml

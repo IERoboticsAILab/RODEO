@@ -76,8 +76,7 @@ cd quick-start/docker
 ./demo.sh build && ./demo.sh start && ./demo.sh logs
 ```
 
-Then create the task in org-web (Category `Logistics`, Task Type
-`ItemTransport`, Reward `100`). The run passes when the agent logs
+Then create a Delivery task in org-web (Tasks tab, Service dropdown). The run passes when the agent logs
 `task N: VERIFIED - reward paid` and the oracle logs `APPROVED`. The demo
 must use the bridge's `ROS_DOMAIN_ID` and `ROBOT_NAMESPACE`; all compose files
 default to domain 40 and no namespace.

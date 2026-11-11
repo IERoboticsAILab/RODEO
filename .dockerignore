@@ -1,0 +1,11 @@
+# Docker build contexts at the repo root (org-web, oracle, robot agent, demo)
+.git
+**/node_modules
+**/.next
+**/__pycache__
+**/build
+**/install
+**/log
+blockchain-network/ganache-docker/ganache_db*
+oracle/proofs
+oracle/state

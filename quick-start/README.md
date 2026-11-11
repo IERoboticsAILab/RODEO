@@ -49,22 +49,15 @@ The agent logs `register service 'Delivery' ...: ok` (or reuses the service
 it registered before) and then `ready - waiting for assignments`. Create a task
 in org-web (`http://localhost:8080`, Tasks tab):
 
-| Field | Value |
-|---|---|
-| Title | Package delivery |
-| Description | Package delivery |
-| Category | Logistics |
-| Type | ItemTransport |
-| Reward | 100 |
-
-Category and Type must match exactly: that is how the contract matches the task
-to the service. A free-text description runs the Delivery service with its
-default places (package pick-up to package drop-off). To choose the places, put
-JSON in the Description field instead:
-
-```json
-{"v": 1, "params": {"pickup": "farah_desk", "dropoff": "samuel_desk", "sender": "Farah", "recipient": "Samuel"}, "note": "fragile"}
-```
+1. In **Service**, pick `Delivery (Logistics/ItemTransport) - from 100 IEC`.
+   The list shows only services that are online; it appears once the agent has
+   registered the Panther's service.
+2. Choose the **pick-up place** and **Deliver to** from the dropdowns (they
+   default to package pick-up and package drop-off), and optionally the sender,
+   recipient and package weight.
+3. Add a **note** if you like; the **reward** is pre-filled with the service's
+   price.
+4. Click **Create task**.
 
 The run succeeds when the agent logs `task N: VERIFIED - reward paid`. After
 the second task, it logs `charging (battery at 20 %)`, then

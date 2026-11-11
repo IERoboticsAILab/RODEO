@@ -17,6 +17,7 @@ async function j<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
 
 export const api = {
   contracts: () => j<import("./types").Contracts>(fetch(`${API_BASE}/contracts`)),
+  catalog: () => j<import("./types").CatalogEntry[]>(fetch(`${API_BASE}/catalog`)),
 
   tasks: {
     all: () => j<import("./types").Task[]>(fetch(`${API_BASE}/tasks`)),
@@ -25,7 +26,8 @@ export const api = {
       j<import("./types").Task[]>(
         fetch(`${API_BASE}/tasks/by-creator${addr ? `?creator=${addr}` : ""}`)
       ),
-    register: (body: { description: string; category: string; taskType: string; rewardIec: number }) =>
+    register: (body: { description: string; category: string; taskType: string; rewardIec: number;
+                       params?: Record<string, string | number> }) =>
       j<{ txHash: string }>(
         fetch(`${API_BASE}/tasks/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       ),
@@ -75,8 +77,10 @@ export const fetchTasks = async () => {
   return { mine: mineRaw.map(mapTask), all: allRaw.map(mapTask) };
 };
 
-export const createTask = (body: { description: string; category: string; taskType: string; rewardIec: number }) =>
+export const createTask = (body: { description: string; category: string; taskType: string; rewardIec: number;
+                                   params?: Record<string, string | number> }) =>
   api.tasks.register(body);
+export const fetchCatalog = () => api.catalog();
 export const deleteTask = (id: number) => api.tasks.remove(id);
 export const activateTask = (id: number) => api.tasks.activate(id);
 

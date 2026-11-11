@@ -1,5 +1,6 @@
 import { Task } from "../lib/types";
 import { formatUnitsString } from "../lib/units";
+import { describeTask } from "../lib/describe";
 
 // allow extra fields produced by the fetch wrapper
 type TaskRow = Task & { rewardToken?: string | number; rewardIec?: string | number; rewardWei?: string | number };
@@ -44,6 +45,7 @@ export default function TaskTable({
             <th className="th">Reward</th>
             <th className="th">Category</th>
             <th className="th">Type</th>
+            <th className="th">Details</th>
             <th className="th">Creator</th>
             <th className="th">Executor</th>
             <th className="th">Status</th>
@@ -70,6 +72,9 @@ export default function TaskTable({
                 <td className="td">{token} IEC</td> {/* show token value */}
                 <td className="td">{row.taskCategory}</td>
                 <td className="td">{row.taskType}</td>
+                <td className="td max-w-[18rem] truncate" title={describeTask((row as any).description ?? "")}>
+                  {describeTask((row as any).description ?? "")}
+                </td>
                 <td className="td">{row.creator}</td>
                 <td className="td">{row.executor}</td>
                 <td className="td"><span className="badge" style={badgeStyle(STATUS_BG[row.status] ?? "#e5e7eb")}>{statusLabel(row.status)}</span></td>

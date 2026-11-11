@@ -13,6 +13,7 @@ services:
       robot:  {type: text, label: Robot}
       wallet: {type: text, label: Robot wallet}
     settings:
+      robot_only: true            # ordered by robots' agents, not shown in org-web's task form
       min_wh: 0.3                 # oracle: least energy a session must deliver
       # stub source only (until the WiBotic logger exists): simulated session
       stub_seconds: 10

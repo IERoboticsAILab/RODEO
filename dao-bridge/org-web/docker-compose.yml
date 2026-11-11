@@ -1,8 +1,8 @@
 services:
   org-web:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..                      # repo root (for robot-agent's rodeo_common)
+      dockerfile: dao-bridge/org-web/Dockerfile
       args:
         # baked into the client bundle at build time
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-/api}

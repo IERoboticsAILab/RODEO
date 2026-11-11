@@ -13,6 +13,8 @@ from org_code import (
     deposit_to_organization, iecoin, organization
 )
 
+from catalog import build_catalog, find, task_description
+
 app = FastAPI(title="Organization Console API")
 
 app.add_middleware(
@@ -24,10 +26,12 @@ app.add_middleware(
 )
 
 class TaskCreate(BaseModel):
-    description: str
+    description: str = ""                       # free text; with params it is the task's note
     category: str
     taskType: str
     rewardIec: float = Field(gt=0)
+    # RODEO v2 services: parameters from the catalog's schema (None = free-text task)
+    params: Optional[Dict[str, Any]] = None
 
 class TaskId(BaseModel):
     taskId: int
@@ -74,10 +78,27 @@ def tasks_assigned_to_org() -> List[Dict[str, Any]]:
 
 # ---------- Task writes ----------
 
+@app.get("/catalog")
+def catalog() -> List[Dict[str, Any]]:
+    """What can be ordered now: one entry per kind of active service (see catalog.py)."""
+    return build_catalog(list_all_services())
+
+
 @app.post("/tasks/register")
 def tasks_register(body: TaskCreate) -> Dict[str, str]:
     try:
-        tx = register_task(body.description, body.category, body.taskType, body.rewardIec)
+        description = body.description
+        if body.params is not None:
+            services = list_all_services()
+            entry = find(build_catalog(services), body.category, body.taskType)
+            if entry is None:
+                raise ValueError(f"no active service offers {body.category}/{body.taskType}")
+            if body.rewardIec < entry["minPriceIec"]:
+                raise ValueError(f"reward {body.rewardIec:g} IEC is below the lowest price "
+                                 f"{entry['minPriceIec']:g} IEC: no provider would take it")
+            description = task_description(services, body.category, body.taskType,
+                                           body.params, body.description)
+        tx = register_task(description, body.category, body.taskType, body.rewardIec)
         return {"txHash": tx}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

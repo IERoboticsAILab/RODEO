@@ -30,3 +30,28 @@ export type Contracts = {
   taskManager: string
   serviceManager: string
 }
+
+// GET /catalog: one entry per kind of active service (see backend/catalog.py)
+export type ParamSpec = {
+  type: "place" | "text" | "number"
+  label: string
+  optional: boolean
+  default?: string | number
+}
+
+export type CatalogEntry = {
+  key: string
+  category: string
+  taskType: string
+  name: string
+  summary: string
+  robot: string
+  structured: boolean
+  minPriceWei: string
+  minPriceIec: number
+  pickPriceIec: number
+  providers: number
+  free: number
+  params: Record<string, ParamSpec>
+  places: Record<string, { label: string }>
+}
