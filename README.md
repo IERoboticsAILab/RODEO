@@ -284,7 +284,7 @@ Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 1. Register the Panther's Delivery service on the blockchain (check the web UI and you will see the new service).
 2. Use the organization web console to create a new task!
 
-   2.1 Navigate to the Tasks tab, pick **Delivery** in the Service dropdown (only services that are online are listed; Category and Type fill in by themselves), give the task a Title, choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. The reward is pre-filled with the service's price.
+   2.1 Navigate to the Tasks tab, give the task a Name, choose Category **Logistics** and Type **ItemTransport (Delivery)** (only services that are online are listed; the price fills in), choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. When the organization's **Task funds** run low, deposit more on the same page.
 
    2.2 After creating the task you will notice that it has been assigned to the robot wallet.
 3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload, recipient confirmation.

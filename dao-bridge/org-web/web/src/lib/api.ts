@@ -81,6 +81,12 @@ export const createTask = (body: { description: string; category: string; taskTy
                                    params?: Record<string, string | number> }) =>
   api.tasks.register(body);
 export const fetchCatalog = () => api.catalog();
+
+export type OrgFunds = { taskFundsIec: number; walletIec: number; balanceIec: number };
+export const fetchOrgFunds = () => j<OrgFunds>(fetch(`${API_BASE}/organization/balance`));
+export const depositOrgFunds = (amountIec: number) =>
+  j<{ txHash: string }>(fetch(`${API_BASE}/organization/deposit`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountIec }) }));
 export const deleteTask = (id: number) => api.tasks.remove(id);
 export const activateTask = (id: number) => api.tasks.activate(id);
 

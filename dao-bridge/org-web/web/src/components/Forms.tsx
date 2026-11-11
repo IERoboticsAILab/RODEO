@@ -62,44 +62,54 @@ function ParamField({ name, spec, entry, value, onChange }: {
 
 /**
  * Task form, the same for every service:
- *   base     Service (from the services that are online), Category and Type
- *            (set by the service), Title, Description, Reward
- *   details  only the fields the chosen service declares (e.g. a delivery's
- *            pick-up and drop-off places); fixed services have none
- * Offline services do not appear; busy ones are marked as queueing.
+ *   Name | Description | Category | Type | Price
+ * Category and Type are dropdowns of what the services online offer, empty at
+ * first. Choosing a type sets the price and opens a "<service> details"
+ * section with only the fields that service declares (e.g. a delivery's
+ * places); fixed services have none. Offline services do not appear; busy ones
+ * are marked as queueing.
  */
 export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
-  const [key, setKey] = useState("");
+  const [category, setCategory] = useState("");
+  const [taskType, setTaskType] = useState("");
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
-  const [reward, setReward] = useState(0);
+  const [reward, setReward] = useState<number | "">("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const entry = useMemo(() => catalog?.find(e => e.key === key), [catalog, key]);
+  const categories = useMemo(
+    () => Array.from(new Set((catalog ?? []).map(e => e.category))).sort(), [catalog]);
+  const types = useMemo(
+    () => (catalog ?? []).filter(e => e.category === category), [catalog, category]);
+  const entry = useMemo(
+    () => types.find(e => e.taskType === taskType), [types, taskType]);
 
-  // keep a valid selection as services come and go
+  // services come and go: drop a selection that is no longer offered
   useEffect(() => {
-    if (!catalog || catalog.length === 0) { setKey(""); return; }
-    if (!catalog.some(e => e.key === key)) setKey(catalog[0].key);
-  }, [catalog, key]);
+    if (category && !categories.includes(category)) { setCategory(""); setTaskType(""); }
+    else if (taskType && !types.some(e => e.taskType === taskType)) setTaskType("");
+  }, [categories, types, category, taskType]);
 
-  // another service: its defaults, and the reward that gets the task picked up now
+  // a newly chosen service: its defaults, and the price that gets the task picked up now
   useEffect(() => {
     setValues(defaultsFor(entry));
-    setReward(entry ? (entry.free > 0 ? entry.pickPriceIec : entry.minPriceIec) : 0);
+    setReward(entry ? (entry.free > 0 ? entry.pickPriceIec : entry.minPriceIec) : "");
     setError("");
   }, [entry?.key]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!catalog) return <p className="text-sm opacity-70">Loading services...</p>;
-  if (catalog.length === 0) {
-    return <p className="text-sm opacity-70">No service is online. Tasks can be posted once a robot has registered a service.</p>;
+  function chooseCategory(c: string) {
+    setCategory(c);
+    const offered = (catalog ?? []).filter(e => e.category === c);
+    setTaskType(offered.length === 1 ? offered[0].taskType : "");    // one type: pick it
   }
+
+  if (!catalog) return <p className="text-sm opacity-70">Loading services...</p>;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!entry) return;
+    if (!entry || reward === "") return;
     const params: Record<string, string | number> = {};
     for (const [name, spec] of Object.entries(entry.params)) {
       const v = values[name] ?? "";
@@ -110,7 +120,7 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
     setError("");
     try {
       await onCreate({ title: title.trim(), category: entry.category, taskType: entry.taskType,
-                       rewardIec: reward, description: note, params });
+                       rewardIec: Number(reward), description: note, params });
       setTitle("");
       setNote("");
       setValues(defaultsFor(entry));
@@ -124,71 +134,103 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
   const paramNames = entry ? Object.keys(entry.params) : [];
   return (
     <form onSubmit={submit} className="space-y-4">
-      {/* ---------------- base: the same for every service */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-        <div className="space-y-1 md:col-span-6">
-          <label className="label">Service</label>
-          <select className="input focus-ring" value={key} onChange={e => setKey(e.target.value)}>
-            {catalog.map(e => (
-              <option key={e.key} value={e.key}>{e.name}</option>
-            ))}
-          </select>
+        <div className="space-y-1 md:col-span-2">
+          <label className="label">Name</label>
+          <input className="input focus-ring" value={title} onChange={e => setTitle(e.target.value)} required />
         </div>
-        <div className="space-y-1 md:col-span-3">
-          <label className="label">Category</label>
-          <input className="input" value={entry?.category ?? ""} readOnly tabIndex={-1} />
-        </div>
-        <div className="space-y-1 md:col-span-3">
-          <label className="label">Type</label>
-          <input className="input" value={entry?.taskType ?? ""} readOnly tabIndex={-1} />
-        </div>
-      </div>
-      {entry ? (
-        <p className="text-xs opacity-70 -mt-2">
-          {entry.summary ? `${entry.summary} · ` : ""}{availability(entry)}
-        </p>
-      ) : null}
-
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
         <div className="space-y-1 md:col-span-4">
-          <label className="label">Title</label>
-          <input className="input focus-ring" value={title} onChange={e => setTitle(e.target.value)} required
-                 placeholder="a short name for the task" />
-        </div>
-        <div className="space-y-1 md:col-span-6">
           <label className="label">Description</label>
-          <input className="input focus-ring" value={note} onChange={e => setNote(e.target.value)}
-                 placeholder="anything the robot or the people involved should know" />
+          <input className="input focus-ring" value={note} onChange={e => setNote(e.target.value)} />
         </div>
         <div className="space-y-1 md:col-span-2">
-          <label className="label">Reward (IEC)</label>
+          <label className="label">Category</label>
+          <select className="input focus-ring" value={category} onChange={e => chooseCategory(e.target.value)} required>
+            <option value="" disabled>{categories.length ? "Select..." : "No service online"}</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1 md:col-span-2">
+          <label className="label">Type</label>
+          <select className="input focus-ring" value={taskType} onChange={e => setTaskType(e.target.value)}
+                  required disabled={!category}>
+            <option value="" disabled>{category ? "Select..." : "-"}</option>
+            {types.map(e => <option key={e.key} value={e.taskType}>{e.taskType} ({e.name})</option>)}
+          </select>
+        </div>
+        <div className="space-y-1 md:col-span-2">
+          <label className="label">Price (IEC)</label>
           <input type="number" className="input focus-ring" value={reward} min={entry?.minPriceIec ?? 0}
-                 step="any" onChange={e => setReward(Number(e.target.value))} required />
+                 step="any" onChange={e => setReward(e.target.value === "" ? "" : Number(e.target.value))}
+                 required disabled={!entry} />
         </div>
       </div>
 
-      {/* ---------------- details: only what the chosen service declares */}
-      {paramNames.length > 0 && entry ? (
-        <fieldset className="border rounded-md p-3 space-y-2">
-          <legend className="px-1 text-sm font-semibold">{entry.name} details</legend>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {paramNames.map(name => (
-              <ParamField key={name} name={name} spec={entry.params[name]} entry={entry}
-                          value={values[name] ?? ""} onChange={v => setValues({ ...values, [name]: v })} />
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
+      {entry ? (
+        <>
+          <p className="text-xs opacity-70 -mt-2">
+            {entry.name}{entry.summary ? `: ${entry.summary}` : ""} · {availability(entry)}
+          </p>
 
-      <div className="flex items-center gap-3">
-        <button className="btn btn-default focus-ring" type="submit" disabled={busy || !entry}>
-          {busy ? "Posting..." : "Create task"}
-        </button>
-        <span className="text-xs opacity-70">
-          The robot is paid its service price; a reward above it stays in the contract.
-        </span>
-      </div>
+          {paramNames.length > 0 ? (
+            <fieldset className="border rounded-md p-3 space-y-2">
+              <legend className="px-1 text-sm font-semibold">{entry.name} details</legend>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {paramNames.map(name => (
+                  <ParamField key={name} name={name} spec={entry.params[name]} entry={entry}
+                              value={values[name] ?? ""} onChange={v => setValues({ ...values, [name]: v })} />
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
+
+          <div className="flex items-center gap-3">
+            <button className="btn btn-default focus-ring" type="submit" disabled={busy}>
+              {busy ? "Posting..." : "Create task"}
+            </button>
+            <span className="text-xs opacity-70">
+              The robot is paid its service price; a price above it stays in the contract.
+            </span>
+          </div>
+        </>
+      ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    </form>
+  );
+}
+
+/** Funds the organization can still put into tasks, and a deposit box. */
+export function TaskFunds({ funds, onDeposit }: {
+  funds: { taskFundsIec: number; walletIec: number } | undefined;
+  onDeposit: (amountIec: number) => Promise<void>;
+}) {
+  const [amount, setAmount] = useState(1000);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!funds) return null;
+  async function deposit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try { await onDeposit(amount); } catch (err: any) { setError(err?.message || String(err)); }
+    finally { setBusy(false); }
+  }
+  return (
+    <form onSubmit={deposit} className="flex flex-wrap items-end gap-3">
+      <div className="text-sm">
+        <div><span className="font-semibold">Task funds:</span> {funds.taskFundsIec} IEC available</div>
+        <div className="text-xs opacity-70">organization wallet: {funds.walletIec} IEC</div>
+      </div>
+      <div className="space-y-1">
+        <label className="label">Deposit (IEC)</label>
+        <input type="number" className="input focus-ring w-32" value={amount} min={1}
+               onChange={e => setAmount(Number(e.target.value))} />
+      </div>
+      <button className="btn focus-ring" type="submit" disabled={busy}>{busy ? "Depositing..." : "Deposit"}</button>
+      <span className="text-xs opacity-70 basis-full">
+        A deposit sets the available funds to the amount deposited (contract behaviour): deposit when they run low.
+      </span>
+      {error ? <p className="text-sm text-red-600 basis-full">{error}</p> : null}
     </form>
   );
 }

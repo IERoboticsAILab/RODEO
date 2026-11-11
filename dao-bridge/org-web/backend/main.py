@@ -10,7 +10,7 @@ from org_code import (
     manager_addresses, ORG_CONTRACT_ADDR, Web3,
     list_iecoin_holders, IECOIN_ADDR,
     TOKEN_SYMBOL, TOKEN_DECIMALS,
-    deposit_to_organization, iecoin, organization
+    deposit_to_organization, iecoin, organization, task_funds_wei, ORG_WALLET_ADDR
 )
 
 from catalog import build_catalog, find, task_description
@@ -99,6 +99,10 @@ def tasks_register(body: TaskCreate) -> Dict[str, str]:
                                  f"{entry['minPriceIec']:g} IEC: no provider would take it")
             description = task_description(services, body.category, body.taskType,
                                            body.params, body.description, body.title)
+        funds = task_funds_wei()
+        if funds < Web3.to_wei(body.rewardIec, "ether"):
+            raise ValueError(f"the organization has {funds / 10**18:g} IEC left for tasks, less than the "
+                             f"{body.rewardIec:g} IEC reward: deposit more IEC (Tasks page, Task funds)")
         tx = register_task(description, body.category, body.taskType, body.rewardIec)
         return {"txHash": tx}
     except Exception as e:
@@ -209,6 +213,9 @@ def organization_balance() -> Dict[str, Any]:
             "balanceIec": float(web3.from_wei(org_balance, "ether")),
             "allowanceWei": str(allowance),
             "allowanceIec": float(web3.from_wei(allowance, "ether")),
+            # what new tasks can use, and what the organization's wallet could deposit
+            "taskFundsIec": float(web3.from_wei(task_funds_wei(), "ether")),
+            "walletIec": float(web3.from_wei(iecoin.functions.balanceOf(ORG_WALLET_ADDR).call(), "ether")),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

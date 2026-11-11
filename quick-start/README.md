@@ -49,15 +49,19 @@ The agent logs `register service 'Delivery' ...: ok` (or reuses the service
 it registered before) and then `ready - waiting for assignments`. Create a task
 in org-web (`http://localhost:8080`, Tasks tab):
 
-1. In **Service**, pick **Delivery**. The list shows only services that are
-   online; Delivery appears once the agent has registered the Panther's
-   service. Category and Type fill in by themselves.
-2. Give the task a **Title**, and a **Description** if you like; the **Reward**
-   is pre-filled with the service's price.
+1. Give the task a **Name**, and a **Description** if you like.
+2. Choose **Category** `Logistics`, then **Type** `ItemTransport (Delivery)`.
+   The dropdowns list only services that are online, so they fill once the
+   agent has registered the Panther's service. **Price** is then pre-filled
+   with the service's price.
 3. Under **Delivery details**, choose the **pick-up place** and **Deliver to**
-   from the dropdowns (they default to package pick-up and package drop-off),
-   and optionally the sender, recipient and package weight.
+   (they default to package pick-up and package drop-off), and optionally the
+   sender, recipient and package weight.
 4. Click **Create task**.
+
+The organization pays for the tasks it posts from its deposit, shown as
+**Task funds** on the same page. Deployment deposits 1000 IEC (ten 100 IEC
+tasks); when it runs low, deposit more there.
 
 The run succeeds when the agent logs `task N: VERIFIED - reward paid`. After
 the second task, it logs `charging (battery at 20 %)`, then

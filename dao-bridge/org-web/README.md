@@ -180,11 +180,26 @@ docker run -d \
 
 ## The task form
 
-Every task has the same base, whatever the service: **Service** (Category and
-Type are set by it), **Title**, **Description** and **Reward**. Below that, a
-**details** section shows only the fields the chosen service declares, such as a
-delivery's pick-up and drop-off places; fixed services, like a lab tour, have
-none.
+Every task has the same base, whatever the service: **Name**, **Description**,
+**Category**, **Type** and **Price**. Category and Type are dropdowns of what the
+online services offer, empty at first; choosing a type pre-fills the price and
+opens a **details** section with only the fields that service declares, such as
+a delivery's pick-up and drop-off places. Fixed services, like a lab tour, have
+no details.
+
+### Task funds
+
+Tasks posted from the console are paid by the Organization contract from its
+deposit, shown as **Task funds** on the Tasks page with a deposit box
+(`GET /organization/balance`, `POST /organization/deposit`). The deposit first
+approves the Organization contract, then deposits. A task is refused with a
+clear message when the funds don't cover its price.
+
+Contract behaviour to know: `Organization.deposit` *sets* the TaskManager's
+allowance to the amount deposited rather than adding to it, so the funds
+available after a deposit equal that deposit. Unspent funds from earlier
+deposits, and refunds from rejected tasks, stay in the contract but can't be
+used. Deposit when the funds run low.
 
 The Tasks page is built from `GET /catalog`, which lists one entry per kind of
 service (category and task type) that an **active** service offers:

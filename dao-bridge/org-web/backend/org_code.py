@@ -234,10 +234,29 @@ def remove_service(service_id: int) -> str:
     return rcpt.transactionHash.hex()
 
 def deposit_to_organization(amount_iec: float) -> str:
-    """Deposit IEC tokens into Organization contract for task rewards"""
+    """
+    Deposit IEC from the organization's wallet into the Organization contract,
+    which funds the tasks it posts. The contract pulls the IEC with
+    transferFrom, so the wallet first approves it for the amount.
+
+    Note: Organization.deposit *sets* the TaskManager's allowance to the amount
+    deposited (it does not add to it), so after a deposit the funds available
+    for tasks equal that deposit; any unspent remainder of earlier deposits or
+    refunds stays in the contract unusable (a contract issue).
+    """
     amount_wei = web3.to_wei(amount_iec, "ether")
+    if iecoin.functions.balanceOf(ORG_WALLET_ADDR).call() < amount_wei:
+        raise ValueError(f"the organization's wallet holds less than {amount_iec:g} IEC")
+    send_tx(iecoin.functions.approve(organization.address, amount_wei))
     rcpt = send_tx(organization.functions.deposit(amount_wei))
     return rcpt.transactionHash.hex()
+
+
+def task_funds_wei() -> int:
+    """IEC the Organization can still put into tasks (its TaskManager allowance, capped by its balance)."""
+    tm_addr = organization.functions.taskManager().call()
+    allowance = iecoin.functions.allowance(organization.address, tm_addr).call()
+    return min(allowance, iecoin.functions.balanceOf(organization.address).call())
 
 def set_service_busy(index: int, is_busy: bool) -> str:
     rcpt = send_tx(organization.functions.setServiceBusy(index, is_busy))
