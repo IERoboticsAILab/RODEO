@@ -311,6 +311,7 @@ rodeo-oracle  | Approved task 1
 rodeo-oracle  | Task 1 verified
 ```
 6. Next check the web console: in the home tab you can see that the payment is released to the robot.
+7. Post a second task: the simulated battery then drops below 30 %, and the robot pays the institution's charging station 20 IEC for a charge, verified by the oracle like any other task (see [quick-start/README.md](quick-start/README.md); the station's keystore is created once with `make_wallet.py`).
 
 **Expected output** (abridged):
 ```

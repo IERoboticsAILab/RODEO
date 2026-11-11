@@ -15,6 +15,9 @@ case "${1:-agent}" in
     echo "rodeo-agent: ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} namespace='${ROBOT_NAMESPACE:-}' services=${SERVICES}"
     exec "$BIN/agent" "${ROS_ARGS[@]}" -p services_file:="$SERVICES" \
          -p proof_dir:="${PROOF_DIR:-/root/oracle/proofs}" ;;
+  station-executor)
+    echo "station-executor: ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} namespace='${ROBOT_NAMESPACE:-}' services=${SERVICES}"
+    exec "$BIN/station_executor" "${ROS_ARGS[@]}" -p services_file:="$SERVICES" ;;
   fake-executor)
     echo "fake-executor: ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} namespace='${ROBOT_NAMESPACE:-}' proof_mode=${PROOF_MODE:-rodeo}"
     exec "$BIN/fake_executor" "${ROS_ARGS[@]}" -p services_file:="$SERVICES" \

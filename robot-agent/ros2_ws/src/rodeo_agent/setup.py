@@ -23,6 +23,7 @@ setup(
         "console_scripts": [
             "agent = rodeo_agent.agent_node:main",
             "fake_executor = rodeo_agent.fake_executor:main",
+            "station_executor = rodeo_agent.station_executor:main",
         ],
     },
 )

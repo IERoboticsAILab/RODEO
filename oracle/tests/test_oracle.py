@@ -111,3 +111,41 @@ def test_legacy_waste_bags():
     assert good.ok and any("total 10.956 m" in l for l in good.lines)
     bad = validate_bag(os.path.join(HERE, "..", "proofs", "task_tid1_20250904_164349.bag"))
     assert not bad.ok and bad.reason == "Disposal event missing or incorrect"
+
+
+# ------------------------------------------------------------------ charging
+from oracle_node.validators.charging import SESSION_END, SESSION_START, delivered_wh  # noqa: E402
+
+STATION_DESC = json.dumps({"v": 1, "robot": "station", "summary": "", "settings": {"min_wh": 0.3},
+                           "params": {"robot": {"type": "text", "label": "Robot", "optional": False},
+                                      "wallet": {"type": "text", "label": "Robot wallet", "optional": False}}})
+ROBOT = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+
+
+def charge_proof(actor=ROBOT, seconds=10, amps=4.0, volts=38.0):
+    p = RodeoProof()
+    p.events.append(Event(T0, "note", "", SESSION_START, actor))
+    for k in range(int(seconds * 2) + 1):
+        p.charge.append((T0 + k / 2, volts, amps if k else 0.0, "cc" if k else "ramp_up"))
+    p.events.append(Event(T0 + seconds + 0.5, "note", "", SESSION_END, actor))
+    return p
+
+
+def run_charge(p, creator=ROBOT):
+    t = NS(id=9, category="Energy", task_type="Charging", executor="0x" + "9" * 40, creator=creator)
+    return validator_for("Energy", "Charging")(NS(task=t, proof=p, service_desc=STATION_DESC, settings=None))
+
+
+def test_energy_integral():
+    # 38 V x 4 A for 10 s (after a 0.5 s ramp) = 0.4167 Wh minus half a step of ramp
+    wh = delivered_wh([(0, 38.0, 0.0, "ramp_up"), (0.5, 38.0, 4.0, "cc"), (10.5, 38.0, 4.0, "cc")])
+    assert abs(wh - (38 * 4 * 10 + 38 * 4 * 0.25) / 3600) < 1e-9
+
+
+def test_charging_good_and_bad():
+    assert run_charge(charge_proof()).ok
+    assert run_charge(charge_proof(actor="0x" + "1" * 40)).reason == "charged robot is not the one that paid"
+    assert run_charge(charge_proof(), creator="0x" + "2" * 40).reason == "charged robot is not the one that paid"
+    assert run_charge(charge_proof(seconds=4)).reason.startswith("too little energy delivered")
+    p = charge_proof(); p.events = p.events[:1]
+    assert run_charge(p).reason == "no complete charging session in the proof"

@@ -26,9 +26,10 @@ Both share the chain client, the shared checks and the delivery rules
 (`oracle_node/`), so they give the same verdict for the same proof. Run one at
 a time: both sign as the same oracle wallet.
 
-The ROS 2 oracle runs two nodes in the `/oracle` namespace: `oracle` (chain,
-shared checks, verdicts) and `delivery_validator` (serves
-`/oracle/validate/delivery`). The oracle's `validators` parameter maps a
+The ROS 2 oracle runs three nodes in the `/oracle` namespace: `oracle` (chain,
+shared checks, verdicts), `delivery_validator` (serves
+`/oracle/validate/delivery`) and `charging_validator` (serves
+`/oracle/validate/charging`). The oracle's `validators` parameter maps a
 service kind to a validator service, e.g.
 `Logistics/ItemTransport=validate/delivery`. A RODEO proof for a kind with no
 validator, or whose validator node is not running, is rejected.
@@ -54,6 +55,7 @@ Chosen by the task's category and task type. The rules live in
 
 | Service | Validator | Checks |
 |---|---|---|
+| Energy / Charging | `charging.py` | a complete session (start and end) for the robot that posted and paid for the task; energy integrated from the station's voltage and current samples at least the service's `min_wh`; active charging seen |
 | Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`, declared weight if given); receipt confirmed at drop-off by the named recipient |
 
 A new service gets a validator by:

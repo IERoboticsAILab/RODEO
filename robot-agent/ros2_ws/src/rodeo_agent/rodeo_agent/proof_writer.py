@@ -25,14 +25,15 @@ from geometry_msgs.msg import PoseStamped
 from rclpy.serialization import serialize_message
 
 from rodeo_common.proof import (
-    TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE, proof_basename)
-from rodeo_interfaces.msg import PayloadWeight, ProofManifest, TaskEvent
+    TOPIC_CHARGE, TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE, proof_basename)
+from rodeo_interfaces.msg import ChargeSample, PayloadWeight, ProofManifest, TaskEvent
 
 _TYPES = {
     TOPIC_MANIFEST: "rodeo_interfaces/msg/ProofManifest",
     TOPIC_POSE: "geometry_msgs/msg/PoseStamped",
     TOPIC_EVENTS: "rodeo_interfaces/msg/TaskEvent",
     TOPIC_PAYLOAD_WEIGHT: "rodeo_interfaces/msg/PayloadWeight",
+    TOPIC_CHARGE: "rodeo_interfaces/msg/ChargeSample",
 }
 
 
@@ -74,6 +75,11 @@ class ProofWriter:
         t = time.time_ns()
         self._write(TOPIC_PAYLOAD_WEIGHT, PayloadWeight(stamp=_stamp(t), kg=float(kg),
                                                         stable=bool(stable)), t)
+
+    def charge(self, voltage_v: float, current_a: float, state: str):
+        t = time.time_ns()
+        self._write(TOPIC_CHARGE, ChargeSample(stamp=_stamp(t), voltage_v=float(voltage_v),
+                                               current_a=float(current_a), state=state), t)
 
     # ------------------------------------------------------------------ plumbing
     def _write(self, topic: str, msg, t_ns: int):

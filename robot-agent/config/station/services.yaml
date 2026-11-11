@@ -1,0 +1,20 @@
+# The charging station, run by the institution: its wallet runs a bridge and the
+# generic agent with this file; rodeo_agent's station_executor serves the tasks.
+robot: station
+wallet: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"   # institution (Ganache account #5); replace on a real network
+
+services:
+  - name: Charging
+    category: Energy
+    task_type: Charging
+    price_iec: 20                 # one charging session (see the fee notes in robot-agent/README.md)
+    summary: One wireless charging session at the lab station (WiBotic TR-302)
+    params:
+      robot:  {type: text, label: Robot}
+      wallet: {type: text, label: Robot wallet}
+    settings:
+      min_wh: 0.3                 # oracle: least energy a session must deliver
+      # stub source only (until the WiBotic logger exists): simulated session
+      stub_seconds: 10
+      stub_voltage_v: 38.0
+      stub_current_a: 4.0

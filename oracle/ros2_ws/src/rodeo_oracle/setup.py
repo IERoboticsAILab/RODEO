@@ -23,6 +23,7 @@ setup(
         "console_scripts": [
             "oracle = rodeo_oracle.oracle:main",
             "delivery_validator = rodeo_oracle.delivery_validator:main",
+            "charging_validator = rodeo_oracle.charging_validator:main",
         ],
     },
 )

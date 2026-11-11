@@ -41,4 +41,5 @@ def registered() -> list:
     return sorted(f"{c}/{t}" for c, t in _REGISTRY)
 
 
+from . import charging  # noqa: E402,F401  (registers Energy/Charging)
 from . import delivery  # noqa: E402,F401  (registers Logistics/ItemTransport)

@@ -87,3 +87,29 @@ def test_recovery():
     ts = [task(1), task(2, proof="file:///p#sha256=ab"), task(3, executor="0x" + "1" * 40),
           task(4, status=2), task(5, active=False), task(6, executor=WALLET.lower())]
     assert tasks_to_recover(ts, WALLET) == ([1, 6], [2])
+
+
+# ------------------------------------------------------------------ charging
+from rodeo_agent.logic import battery_low, choose_charging_service  # noqa: E402
+
+
+def station(id, price=20, active=True, busy=False):
+    return OnChainService(id, "Charging", "{}", "Energy", "Charging", price * WEI, active, busy)
+
+
+def test_choose_charging():
+    s, why = choose_charging_service([station(7, 30), station(8, 20), svc(3)], {3}, 25)
+    assert why is None and s.id == 8
+    s, why = choose_charging_service([station(7, 30)], {3}, 25)
+    assert s is None and "above max_price_iec" in why
+    s, why = choose_charging_service([station(7, active=False)], set(), 25)
+    assert s is None and "no charging service" in why
+    s, why = choose_charging_service([station(7, 20, busy=True), station(8, 22)], set(), 25)
+    assert s.id == 8                                   # a free station before a busy one
+    s, _ = choose_charging_service([station(7, 20, busy=True)], set(), 25)
+    assert s.id == 7                                   # only busy ones: queue there
+
+
+def test_battery_low():
+    assert battery_low(0.15, 20) and not battery_low(0.5, 20)
+    assert not battery_low(float("nan"), 20) and not battery_low(0.1, 0)

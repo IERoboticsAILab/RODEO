@@ -20,7 +20,9 @@ from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
 
 from rodeo_common.proof import (
-    TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE)
+    TOPIC_CHARGE, TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE)
+
+PROOF_TOPICS = (TOPIC_MANIFEST, TOPIC_POSE, TOPIC_EVENTS, TOPIC_PAYLOAD_WEIGHT, TOPIC_CHARGE)
 
 KIND_RODEO, KIND_ROS1_BAG, KIND_CSV, KIND_UNKNOWN = "rodeo", "ros1-bag", "csv", "unknown"
 
@@ -44,6 +46,7 @@ class RodeoProof:
     poses: list = field(default_factory=list)       # (t, x, y)
     events: list = field(default_factory=list)      # [Event]
     weights: list = field(default_factory=list)     # (t, kg, stable)
+    charge: list = field(default_factory=list)      # (t, voltage_v, current_a, state)
     log_times: list = field(default_factory=list)   # every message's log time (s)
     topics: dict = field(default_factory=dict)      # topic -> message count
 
@@ -77,8 +80,7 @@ def read_rodeo_proof(path: str) -> RodeoProof:
     with AnyReader([Path(path)], default_typestore=get_typestore(Stores.ROS2_HUMBLE)) as r:
         for c in r.connections:
             proof.topics[c.topic] = proof.topics.get(c.topic, 0) + c.msgcount
-        wanted = [c for c in r.connections
-                  if c.topic in (TOPIC_MANIFEST, TOPIC_POSE, TOPIC_EVENTS, TOPIC_PAYLOAD_WEIGHT)]
+        wanted = [c for c in r.connections if c.topic in PROOF_TOPICS]
         for c, t_ns, raw in r.messages():
             proof.log_times.append(t_ns * 1e-9)
             if c not in wanted:
@@ -92,6 +94,9 @@ def read_rodeo_proof(path: str) -> RodeoProof:
                 proof.events.append(Event(stamp_s(m.stamp), m.type, m.place, m.text, m.actor))
             elif c.topic == TOPIC_PAYLOAD_WEIGHT:
                 proof.weights.append((stamp_s(m.stamp), float(m.kg), bool(m.stable)))
+            elif c.topic == TOPIC_CHARGE:
+                proof.charge.append((stamp_s(m.stamp), float(m.voltage_v), float(m.current_a), m.state))
+    proof.charge.sort()
     proof.poses.sort()
     proof.events.sort(key=lambda e: e.t)
     proof.weights.sort()

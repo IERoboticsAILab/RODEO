@@ -132,3 +132,33 @@ def tasks_to_recover(tasks: list, wallet: str) -> tuple:
         else:
             awaiting.append(int(t.id))
     return sorted(to_run), sorted(awaiting)
+
+
+CHARGING = ("Energy", "Charging")
+
+
+def choose_charging_service(services: list, own_wallet_ids: set, max_price_iec: float):
+    """
+    The cheapest active, non-busy charging service within budget, excluding the
+    robot's own; or (None, reason). ``services`` are OnChainService objects.
+    The contract settles at the service's price and keeps any excess of the
+    posted reward, so the request must post exactly this price.
+    """
+    cands = [s for s in services if (s.category, s.service_type) == CHARGING
+             and s.active and s.id not in own_wallet_ids]
+    if not cands:
+        return None, "no charging service is online"
+    affordable = [s for s in cands if s.price_wei <= max_price_iec * WEI]
+    if not affordable:
+        cheapest = min(s.price_wei for s in cands) / WEI
+        return None, f"cheapest charging costs {cheapest:g} IEC, above max_price_iec {max_price_iec:g}"
+    free = [s for s in affordable if not s.busy] or affordable     # busy: the request queues on chain
+    best = min(free, key=lambda s: (s.price_wei, s.id))
+    if best.price_wei % WEI:
+        return None, f"service {best.id} price is not a whole number of IEC"
+    return best, None
+
+
+def battery_low(percentage: float, charge_below_pct: float) -> bool:
+    """BatteryState.percentage is 0..1 (NaN when unknown)."""
+    return percentage == percentage and charge_below_pct > 0 and percentage * 100.0 < charge_below_pct

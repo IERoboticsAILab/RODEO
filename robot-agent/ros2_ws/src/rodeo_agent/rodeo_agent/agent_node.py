@@ -12,8 +12,18 @@ relative names (dao/..., rodeo/execute_task).
                services busy, queue it
     execute    send rodeo/execute_task to the executor, hash the proof bag it
                returns, submit file://<path>#sha256=<hash>
-    verdict    on task_verified / task_rejected, free the other services
+    verdict    on task_verified / task_rejected, bring the other services back
+    charging   when the battery is low (BatteryState below charging.charge_below_pct)
+               or on request (rodeo/request_charging), and the robot is idle:
+               take its services offline, dock (rodeo/dock on the executor, if
+               offered), post a charging task at exactly the cheapest station's
+               price, and bring the services back at the verdict
     shutdown   deactivate the robot's services so no new work is assigned
+
+While the robot is unavailable (busy with one task, or charging), its other
+services are deactivated rather than marked busy: reactivating a service makes
+the contract assign tasks that waited meanwhile, while clearing a busy flag
+does not.
 
 Tasks run one at a time, in arrival order. Following the project's assumption
 that an online robot can finish its tasks, a task that fails or has invalid
@@ -40,11 +50,17 @@ from rclpy.signals import SignalHandlerOptions
 from rodeo_common.proof import make_proof_uri
 from rodeo_common.services_config import load_robot_config
 from rodeo_interfaces.action import ExecuteTask
-from ros_eth_msgs.action import ActivateService, RegisterService, RemoveService, SetServiceBusy, SubmitProof
+from ros_eth_msgs.action import ActivateService, RegisterService, RegisterTask, RemoveService, SubmitProof
 from ros_eth_msgs.msg import TaskAssignment, TaskId, TaskRejection
-from ros_eth_msgs.srv import GetAllTasks, GetServicesByCreator, GetTask
+from ros_eth_msgs.srv import GetAllServices, GetAllTasks, GetServicesByCreator, GetTask, GetTasksByCreator
+from sensor_msgs.msg import BatteryState
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+
+from rodeo_common.description import encode_task_description
 
 from rodeo_agent.logic import (
+    CHARGING, WEI, battery_low, choose_charging_service,
     STATUS_ASSIGNED, OnChainService, plan_service_sync, prepare_task, tasks_to_recover)
 
 
@@ -75,7 +91,7 @@ class RodeoAgent(Node):
             "register": ActionClient(self, RegisterService, "dao/register_service_action", callback_group=cb),
             "activate": ActionClient(self, ActivateService, "dao/activate_service_action", callback_group=cb),
             "remove": ActionClient(self, RemoveService, "dao/remove_service_action", callback_group=cb),
-            "busy": ActionClient(self, SetServiceBusy, "dao/set_service_busy_action", callback_group=cb),
+            "task": ActionClient(self, RegisterTask, "dao/register_task_action", callback_group=cb),
             "submit": ActionClient(self, SubmitProof, "dao/submit_proof_action", callback_group=cb),
             "execute": ActionClient(self, ExecuteTask, "rodeo/execute_task", callback_group=cb),
         }
@@ -83,6 +99,9 @@ class RodeoAgent(Node):
             "services": self.create_client(GetServicesByCreator, "dao/get_services_by_creator", callback_group=cb),
             "task": self.create_client(GetTask, "dao/get_task_by_id", callback_group=cb),
             "tasks": self.create_client(GetAllTasks, "dao/get_all_tasks", callback_group=cb),
+            "all_services": self.create_client(GetAllServices, "dao/get_all_services", callback_group=cb),
+            "my_tasks": self.create_client(GetTasksByCreator, "dao/get_tasks_by_creator", callback_group=cb),
+            "dock": self.create_client(Trigger, "rodeo/dock", callback_group=cb),
         }
         self.create_subscription(TaskAssignment, "dao/task_assigned", self._on_assigned, 50, callback_group=cb)
         self.create_subscription(TaskId, "dao/task_verified", self._on_verified, 50, callback_group=cb)
@@ -91,7 +110,21 @@ class RodeoAgent(Node):
         self.service_ids: dict = {}        # (category, task_type) -> on-chain service id
         self.work: "queue.Queue" = queue.Queue()
         self.seen: set = set()             # task ids queued or done (dedupe)
-        self.awaiting: dict = {}           # task id -> sibling service ids set busy for it
+        self.awaiting: dict = {}           # task id -> own service ids taken offline for it
+        self.charging_task = None          # id of our pending charging task
+
+        # charging (services.yaml `charging:`); 0 disables the battery trigger
+        ch = self.cfg.charging
+        self.max_charge_price = float(ch.get("max_price_iec", 0))
+        self.charge_below = float(ch.get("charge_below_pct", 0))
+        self.battery_pct = float("nan")
+        self._charge_cooldown_until = 0.0
+        if ch.get("battery_topic") and self.charge_below > 0:
+            self.create_subscription(BatteryState, ch["battery_topic"], self._on_battery, 10,
+                                     callback_group=cb)
+        self.create_service(Trigger, "rodeo/request_charging", self._on_request_charging,
+                            callback_group=cb)
+        self.charged_pub = self.create_publisher(String, "rodeo/charged", 10)
         self.lock = threading.Lock()
         self.stopping = threading.Event()
 
@@ -222,24 +255,63 @@ class RodeoAgent(Node):
         self.work.put(("verdict", (task_id, ok, reason)))
 
     # ================================================================== worker
+    def _on_battery(self, msg: BatteryState) -> None:
+        self.battery_pct = float(msg.percentage)
+
+    def _on_request_charging(self, _req, res):
+        if self.charging_task is not None:
+            res.success, res.message = False, f"charging task {self.charging_task} already pending"
+        elif self.max_charge_price <= 0:
+            res.success, res.message = False, "charging.max_price_iec not set in services.yaml"
+        else:
+            self.work.put(("charge", "requested"))
+            res.success, res.message = True, "charging request queued"
+        return res
+
+    def _idle(self) -> bool:
+        with self.lock:
+            return self.work.empty() and not self.awaiting and self.charging_task is None
+
     def run(self) -> None:
         while not self.stopping.is_set():
             try:
                 kind, arg = self.work.get(timeout=0.5)
             except queue.Empty:
+                if (battery_low(self.battery_pct, self.charge_below) and self._idle()
+                        and time.monotonic() > self._charge_cooldown_until):
+                    self.work.put(("charge", f"battery at {self.battery_pct * 100:.0f} %"))
                 continue
             try:
                 if kind == "task":
                     self.execute(arg)
+                elif kind == "charge":
+                    self.request_charging(arg)
                 else:
                     self.finish(*arg)
             except Exception as e:  # noqa: BLE001 - keep serving later tasks
                 self.log.error(f"{kind} {arg}: {e}")
 
-    def _set_busy(self, ids, busy: bool, why: str) -> None:
+    def _pause(self, ids, why: str) -> set:
+        """Take services offline (deactivate); returns those that were taken offline."""
+        paused = set()
+        if not ids:
+            return paused
+        state = {s.id: s for s in self._own_services()}
         for sid in sorted(ids):
-            self._tx("busy", SetServiceBusy.Goal(service_id=sid, is_busy=busy),
-                     f"mark service {sid} {'busy' if busy else 'free'} ({why})")
+            s = state.get(sid)
+            if s is None or not s.active:
+                continue
+            if s.busy:
+                self.log.warning(f"service {sid} is busy and stays online ({why})")
+                continue
+            if self._tx("remove", RemoveService.Goal(service_id=sid), f"take service {sid} offline ({why})"):
+                paused.add(sid)
+        return paused
+
+    def _resume(self, ids, why: str) -> None:
+        """Bring services back online; the contract then assigns tasks that waited."""
+        for sid in sorted(ids):
+            self._tx("activate", ActivateService.Goal(service_id=sid), f"bring service {sid} back ({why})")
 
     def execute(self, task_id: int) -> None:
         res = self._call("task", GetTask.Request(task_id=task_id))
@@ -256,8 +328,8 @@ class RodeoAgent(Node):
             return
 
         own = self.service_ids.get((task.category, task.task_type))
-        siblings = {sid for sid in self.service_ids.values() if sid is not None and sid != own}
-        self._set_busy(siblings, True, f"robot busy with task {task_id}")
+        siblings = self._pause({sid for sid in self.service_ids.values() if sid is not None and sid != own},
+                               f"robot busy with task {task_id}")
 
         goal = ExecuteTask.Goal(task_id=task_id, category=task.category, task_type=task.task_type,
                                 params_json=json.dumps(prepared.params, sort_keys=True),
@@ -278,12 +350,12 @@ class RodeoAgent(Node):
         if result is None or not result.success:
             msg = result.message if result is not None else "no result"
             self.log.error(f"task {task_id}: execution failed ({msg}) - left for a person to resolve")
-            self._set_busy(siblings, False, f"task {task_id} failed")
+            self._resume(siblings, f"task {task_id} failed")
             return
         if not result.proof_path or not os.path.exists(result.proof_path):
             self.log.error(f"task {task_id}: executor returned proof '{result.proof_path}', "
                            "which this agent cannot read (is the proof folder shared?)")
-            self._set_busy(siblings, False, f"task {task_id} has no proof")
+            self._resume(siblings, f"task {task_id} has no proof")
             return
 
         uri = make_proof_uri(result.proof_path)
@@ -294,19 +366,82 @@ class RodeoAgent(Node):
                         f"task {task_id}: submit proof"):
             with self.lock:
                 self.awaiting.pop(task_id, None)
-            self._set_busy(siblings, False, f"task {task_id} proof not submitted")
+            self._resume(siblings, f"task {task_id} proof not submitted")
             return
         self.log.info(f"task {task_id}: waiting for the oracle")
 
     def finish(self, task_id: int, ok: bool, reason: str) -> None:
         with self.lock:
             siblings = self.awaiting.pop(task_id, set())
+            charging = task_id == self.charging_task
+            if charging:
+                self.charging_task = None
+        if charging:
+            self.log.info(f"charging task {task_id}: " + ("VERIFIED - station paid" if ok else
+                          f"REJECTED ({reason or 'no reason'}) - escrow refunded"))
+            self.charged_pub.publish(String(data=json.dumps({"task_id": task_id, "ok": ok})))
+            if not ok:
+                self._charge_cooldown_until = time.monotonic() + 60.0
+            self._resume(siblings, f"charging task {task_id} settled")
+            return
         if ok:
             self.log.info(f"task {task_id}: VERIFIED - reward paid")
         else:
             self.log.warning(f"task {task_id}: REJECTED by the oracle ({reason or 'no reason given'}); "
                              "the contract refunded the creator and deactivated the task")
-        self._set_busy(siblings, False, f"task {task_id} settled")
+        self._resume(siblings, f"task {task_id} settled")
+
+    # ================================================================== charging
+    def request_charging(self, reason: str) -> None:
+        if self.charging_task is not None:
+            return
+        if self.max_charge_price <= 0:
+            self.log.warning("charging requested but charging.max_price_iec is not set")
+            return
+        res = self._call("all_services", GetAllServices.Request())
+        own_ids = {sid for sid in self.service_ids.values() if sid is not None}
+        station, why = choose_charging_service([OnChainService.from_msg(m) for m in res.services],
+                                               own_ids, self.max_charge_price) if res.ok else (None, "query failed")
+        if station is None:
+            self.log.warning(f"charging ({reason}): {why}; retrying in 60 s")
+            self._charge_cooldown_until = time.monotonic() + 60.0
+            return
+        price = station.price_wei // WEI
+        self.log.info(f"charging ({reason}): station service {station.id} '{station.name}', {price} IEC")
+
+        paused = self._pause(own_ids, "charging")
+        if self._s["dock"].wait_for_service(timeout_sec=2.0):
+            try:
+                r = self._call("dock", Trigger.Request(), timeout=600.0)
+                self.log.info(f"dock: {'ok' if r.success else 'FAILED'} {r.message}")
+                if not r.success:
+                    self._resume(paused, "dock failed")
+                    self._charge_cooldown_until = time.monotonic() + 60.0
+                    return
+            except Timeout as e:
+                self.log.error(f"dock: {e}")
+                self._resume(paused, "dock timed out")
+                return
+        else:
+            self.log.info("executor offers no rodeo/dock service: assuming the robot is docked")
+
+        desc = encode_task_description({"robot": self.cfg.robot, "wallet": self.cfg.wallet}, f"charge request ({reason})")
+        if not self._tx("task", RegisterTask.Goal(description=desc, category=CHARGING[0], task_type=CHARGING[1],
+                                                  reward=str(price)), f"post charging task ({price} IEC)"):
+            self._resume(paused, "charging request failed")
+            self._charge_cooldown_until = time.monotonic() + 60.0
+            return
+        mine = self._call("my_tasks", GetTasksByCreator.Request(creator=""))
+        ids = [int(t.id) for t in mine.tasks if (t.category, t.task_type) == CHARGING] if mine.ok else []
+        if not ids:
+            self.log.error("charging task posted but not found on chain")
+            self._resume(paused, "charging task not found")
+            return
+        tid = max(ids)
+        with self.lock:
+            self.charging_task = tid
+            self.awaiting[tid] = paused
+        self.log.info(f"charging task {tid} posted; waiting for the station and the oracle")
 
     # ================================================================== shutdown
     def shutdown_services(self) -> None:

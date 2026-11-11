@@ -8,7 +8,7 @@ Every proof is a ROS 2 bag written by the robot's executor. It always contains:
     /rodeo/events     rodeo_interfaces/TaskEvent       arrive/depart/say/confirm/note
 
 plus service-specific topics (delivery: /rodeo/payload_weight,
-rodeo_interfaces/PayloadWeight).
+rodeo_interfaces/PayloadWeight; charging: /rodeo/charge, rodeo_interfaces/ChargeSample).
 
 The agent submits it as ``file://<absolute path>#sha256=<hex>``. The path may be
 a single file or a bag directory; the hash covers its contents, so the file
@@ -24,6 +24,7 @@ TOPIC_MANIFEST = "/rodeo/manifest"
 TOPIC_POSE = "/rodeo/pose"
 TOPIC_EVENTS = "/rodeo/events"
 TOPIC_PAYLOAD_WEIGHT = "/rodeo/payload_weight"
+TOPIC_CHARGE = "/rodeo/charge"
 REQUIRED_TOPICS = (TOPIC_MANIFEST, TOPIC_POSE, TOPIC_EVENTS)
 
 _CHUNK = 1 << 20

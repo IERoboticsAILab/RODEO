@@ -12,8 +12,9 @@ import yaml
 from rclpy.serialization import deserialize_message
 from rosidl_runtime_py.utilities import get_message
 
-from oracle_node.proofs import Event, RodeoProof, stamp_s
-from rodeo_common.proof import TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE
+from oracle_node.proofs import PROOF_TOPICS, Event, RodeoProof, stamp_s
+from rodeo_common.proof import (
+    TOPIC_CHARGE, TOPIC_EVENTS, TOPIC_MANIFEST, TOPIC_PAYLOAD_WEIGHT, TOPIC_POSE)
 
 
 def storage_id(path: str) -> str:
@@ -34,7 +35,7 @@ def read_proof(path: str) -> RodeoProof:
         topic, data, t_ns = reader.read_next()
         proof.log_times.append(t_ns * 1e-9)
         proof.topics[topic] = proof.topics.get(topic, 0) + 1
-        if topic not in (TOPIC_MANIFEST, TOPIC_POSE, TOPIC_EVENTS, TOPIC_PAYLOAD_WEIGHT):
+        if topic not in PROOF_TOPICS:
             continue
         if topic not in classes:
             classes[topic] = get_message(types[topic])
@@ -45,9 +46,12 @@ def read_proof(path: str) -> RodeoProof:
             proof.poses.append((stamp_s(m.header.stamp), m.pose.position.x, m.pose.position.y))
         elif topic == TOPIC_EVENTS:
             proof.events.append(Event(stamp_s(m.stamp), m.type, m.place, m.text, m.actor))
-        else:
+        elif topic == TOPIC_PAYLOAD_WEIGHT:
             proof.weights.append((stamp_s(m.stamp), float(m.kg), bool(m.stable)))
+        elif topic == TOPIC_CHARGE:
+            proof.charge.append((stamp_s(m.stamp), float(m.voltage_v), float(m.current_a), m.state))
     del reader
+    proof.charge.sort()
     proof.poses.sort()
     proof.events.sort(key=lambda e: e.t)
     proof.weights.sort()

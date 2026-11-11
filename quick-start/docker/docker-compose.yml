@@ -1,32 +1,48 @@
-# Demo without a robot: the RODEO agent plus a fake executor in place of the
-# robot. Uses the Panther's services.yaml (Delivery, nine places), so a task
-# runs exactly as it will on the Panther, minus the driving.
+# Demo without a robot: the Panther's RODEO software with a fake executor in
+# place of the robot (simulated driving and battery), plus the institution's
+# charging station (its own bridge with the institution wallet, the same agent,
+# and the station executor with a simulated charger).
+#
+#   panther:  bridge (separate, dao-bridge/ros2-eth-bridge) + agent + fake-executor
+#   station:  station-bridge + station-agent + station-executor
+#
+# The Panther does deliveries; when its simulated battery drops below 30 % it
+# requests charging, pays the station, and resumes.
 name: rodeo-demo
 
-x-common: &common
+x-agent-image: &agent_image
   build:
     context: ../..
     dockerfile: robot-agent/docker/Dockerfile
   image: rodeo-robot-agent
   network_mode: host
   ipc: host
+
+x-panther: &panther
+  <<: *agent_image
   volumes:
     - ${SERVICES_FILE:-../../robot-agent/config/panther/services.yaml}:/config/services.yaml:ro
     - ../../oracle/proofs:/root/oracle/proofs
 
+x-station: &station
+  <<: *agent_image
+  volumes:
+    - ../../robot-agent/config/station/services.yaml:/config/services.yaml:ro
+    - ../../oracle/proofs:/root/oracle/proofs
+
 services:
   agent:
-    <<: *common
+    <<: *panther
     container_name: rodeo-demo-agent
     command: ["agent"]
     environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # same as the bridge
-      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}     # same as the bridge
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # same as the Panther's bridge
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}     # same as the Panther's bridge
     stop_grace_period: 30s
     restart: unless-stopped
 
   fake-executor:
-    <<: *common
+    <<: *panther
     container_name: rodeo-demo-executor
     command: ["fake-executor"]
     environment:
@@ -35,4 +51,44 @@ services:
       # rodeo: submit the RODEO proof it writes (default)
       # legacy: submit the original ROS 1 waste-demo bag instead (needs LEGACY_PROOFS=1 on the oracle)
       - PROOF_MODE=${PROOF_MODE:-rodeo}
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- charging station
+  station-bridge:
+    build:
+      context: ../../dao-bridge/ros2-eth-bridge
+      dockerfile: docker/Dockerfile
+    image: rodeo-ros2-bridge
+    container_name: rodeo-demo-station-bridge
+    network_mode: host
+    ipc: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=station
+      - ETH_WALLET_PASSPHRASE=${STATION_WALLET_PASSPHRASE:-}
+      - ETH_WALLET_ADDRESS=0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc     # institution (Ganache #5)
+      - ETH_WALLET_KEYSTORE=/root/.ros_eth/wallet.json
+      - ROS_ETH_DAO_YAML=/config/dao.yaml
+    volumes:
+      - ../../dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml:/config/dao.yaml:ro
+      - ${STATION_WALLET_PATH:-~/.ros_eth/station_wallet.json}:/root/.ros_eth/wallet.json:ro
+    restart: unless-stopped
+
+  station-agent:
+    <<: *station
+    container_name: rodeo-demo-station-agent
+    command: ["agent"]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=station
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  station-executor:
+    <<: *station
+    container_name: rodeo-demo-station-executor
+    command: ["station-executor"]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=station
     restart: unless-stopped

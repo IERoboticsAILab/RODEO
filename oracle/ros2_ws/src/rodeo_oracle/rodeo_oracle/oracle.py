@@ -51,7 +51,8 @@ from rodeo_oracle.bag_reader import read_proof
 class RodeoOracle(Node):
     def __init__(self):
         super().__init__("oracle")
-        self.declare_parameter("validators", ["Logistics/ItemTransport=validate/delivery"])
+        self.declare_parameter("validators", ["Logistics/ItemTransport=validate/delivery",
+                                              "Energy/Charging=validate/charging"])
         self.declare_parameter("validator_timeout_sec", 300.0)
         env_legacy = os.environ.get("LEGACY_PROOFS", "1") not in ("0", "false", "no")
         self.declare_parameter("legacy_proofs", env_legacy)
@@ -155,7 +156,8 @@ class RodeoOracle(Node):
                           f"Validator for {t.category}/{t.task_type} not available")
             return
         req = ValidateProof.Request(task_id=t.id, category=t.category, task_type=t.task_type,
-                                    executor=t.executor, params_json=json.dumps(proof.params),
+                                    executor=t.executor, creator=t.creator,
+                                    params_json=json.dumps(proof.params),
                                     service_description=service_desc or "", proof_path=path)
         done, box = threading.Event(), {}
         cli.call_async(req).add_done_callback(lambda f: (box.setdefault("r", f.result()), done.set()))

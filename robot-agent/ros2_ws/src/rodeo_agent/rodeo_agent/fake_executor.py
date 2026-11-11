@@ -16,6 +16,10 @@ Parameters
                                the ROS 1 waste-demo bag
     legacy_proof    path of that ROS 1 bag
     leg_sec         seconds per drive leg (default 4)
+    battery_drain_pct  battery used per task (default 40); the simulated battery is
+                    published on battery/battery_status (as the Panther's driver does)
+                    and refilled when the agent reports a verified charge on
+                    rodeo/charged. It also serves rodeo/dock (a 3 s "drive to the dock").
 """
 from __future__ import annotations
 
@@ -29,6 +33,9 @@ from rclpy.action import ActionServer, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
+from sensor_msgs.msg import BatteryState
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 from rodeo_common.services_config import load_robot_config
 from rodeo_interfaces.action import ExecuteTask
@@ -44,15 +51,43 @@ class FakeExecutor(Node):
         self.declare_parameter("proof_mode", "rodeo")
         self.declare_parameter("legacy_proof", "/root/oracle/proofs/task_tid10_20250910_145742.bag")
         self.declare_parameter("leg_sec", 4.0)
+        self.declare_parameter("battery_drain_pct", 40.0)
         path = self.get_parameter("services_file").value or os.environ.get("RODEO_SERVICES_FILE", "")
         self.places = load_robot_config(path).places if path else {}
         self.mode = self.get_parameter("proof_mode").value
         self.leg = float(self.get_parameter("leg_sec").value)
         self.busy = False
+        cb = ReentrantCallbackGroup()
         ActionServer(self, ExecuteTask, "rodeo/execute_task", execute_callback=self.execute,
-                     goal_callback=self.on_goal, callback_group=ReentrantCallbackGroup())
+                     goal_callback=self.on_goal, callback_group=cb)
+        # simulated battery, dock and charge
+        self.battery = 1.0
+        self.drain = float(self.get_parameter("battery_drain_pct").value) / 100.0
+        self.battery_pub = self.create_publisher(BatteryState, "battery/battery_status", 10)
+        self.create_timer(1.0, self._publish_battery, callback_group=cb)
+        self.create_service(Trigger, "rodeo/dock", self._on_dock, callback_group=cb)
+        self.create_subscription(String, "rodeo/charged", self._on_charged, 10, callback_group=cb)
         self.get_logger().info(f"fake executor ready on {self.resolve_action_name()} "
                                f"(proof_mode={self.mode}, {len(self.places)} places)")
+
+    def _publish_battery(self):
+        self.battery_pub.publish(BatteryState(percentage=float(self.battery), voltage=float("nan"),
+                                              present=True))
+
+    def _on_dock(self, _req, res):
+        self.get_logger().info(f"docking (battery {self.battery * 100:.0f} %)")
+        time.sleep(3.0)
+        res.success, res.message = True, "docked (simulated)"
+        return res
+
+    def _on_charged(self, msg: String):
+        try:
+            ok = bool(json.loads(msg.data).get("ok"))
+        except ValueError:
+            return
+        if ok:
+            self.battery = 1.0
+            self.get_logger().info("charge verified: battery back to 100 %")
 
     def resolve_action_name(self):
         ns = self.get_namespace().rstrip("/")
@@ -83,6 +118,8 @@ class FakeExecutor(Node):
                 result.proof_path = self.get_parameter("legacy_proof").value
                 result.message = f"done; returning the legacy proof (RODEO proof at {proof.path})"
                 log.info(f"task {g.task_id}: legacy mode - returning {result.proof_path}")
+            self.battery = max(0.0, self.battery - self.drain)
+            log.info(f"task {g.task_id}: battery now {self.battery * 100:.0f} %")
             gh.succeed()
             return result
         except Exception as e:  # noqa: BLE001

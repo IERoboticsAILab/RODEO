@@ -18,6 +18,9 @@ def generate_launch_description():
         DeclareLaunchArgument("namespace", default_value="oracle"),
         Node(package="rodeo_oracle", executable="delivery_validator", name="delivery_validator",
              namespace=ns, output="screen"),
+        Node(package="rodeo_oracle", executable="charging_validator", name="charging_validator",
+             namespace=ns, output="screen"),
         Node(package="rodeo_oracle", executable="oracle", name="oracle", namespace=ns, output="screen",
-             parameters=[{"validators": ["Logistics/ItemTransport=validate/delivery"]}]),
+             parameters=[{"validators": ["Logistics/ItemTransport=validate/delivery",
+                                         "Energy/Charging=validate/charging"]}]),
     ])

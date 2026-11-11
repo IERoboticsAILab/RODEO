@@ -1,10 +1,12 @@
 # Quick Start: demo without a robot
 
 The demo runs a robot's RODEO software exactly as on a real robot, with a fake
-executor standing in for the robot itself:
+executor standing in for the robot itself, and the institution's charging
+station next to it:
 
 ```
-bridge (wallet)  ←→  agent  ←→  fake executor
+Panther:  bridge (robot wallet)        ←→  agent  ←→  fake executor (simulated robot and battery)
+Station:  bridge (institution wallet)  ←→  agent  ←→  station executor (simulated charger)
 ```
 
 - The **agent** (`robot-agent/`) registers the robot's services from its
@@ -16,14 +18,25 @@ bridge (wallet)  ←→  agent  ←→  fake executor
   RODEO proof bag along the way.
 
 It uses the Panther's `services.yaml` (Delivery service, nine lab places), so a
-task runs exactly as it will on the Panther, minus the driving. It is also the
+task runs exactly as it will on the Panther, minus the driving. Each delivery
+uses 40 % of the simulated battery; below 30 % the Panther's agent takes the
+robot offline, docks, pays the station 20 IEC and comes back online once the
+oracle has verified the charge. Deliveries posted meanwhile wait and are then
+assigned. It is also the
 acceptance test for the bridge and the agent: a change is good when this run
 still ends with the task verified.
 
 ## Run it
 
 Prerequisites (see the top-level README): Ganache with the contracts deployed,
-org-web, the oracle and the ROS 2 bridge running.
+org-web, the oracle and the ROS 2 bridge (the Panther's) running, and the
+station's keystore created once:
+
+```bash
+python3 dao-bridge/ros2-eth-bridge/scripts/make_wallet.py \
+  --key 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba \
+  --out ~/.ros_eth/station_wallet.json          # Ganache account #5 (institution), Enter for no passphrase
+```
 
 ```bash
 cd quick-start/docker
@@ -53,7 +66,11 @@ JSON in the Description field instead:
 {"v": 1, "params": {"pickup": "farah_desk", "dropoff": "samuel_desk", "sender": "Farah", "recipient": "Samuel"}, "note": "fragile"}
 ```
 
-The run succeeds when the agent logs `task N: VERIFIED - reward paid`.
+The run succeeds when the agent logs `task N: VERIFIED - reward paid`. After
+the second task, it logs `charging (battery at 20 %)`, then
+`charging task N: VERIFIED - station paid`. To charge without waiting for the
+battery, run
+`docker exec rodeo-demo-agent bash -ic "ros2 service call /rodeo/request_charging std_srvs/srv/Trigger"`.
 `./demo.sh stop` stops both containers; the agent deactivates its service
 first, so no new task is assigned while it is down.
 

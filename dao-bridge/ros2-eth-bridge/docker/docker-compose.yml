@@ -6,6 +6,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    image: rodeo-ros2-bridge
     container_name: ros2-eth-bridge
     network_mode: host
     ipc: host            # lets ROS 2 shared-memory transport work between containers
@@ -14,6 +15,9 @@ services:
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
       - OWN_ASSIGNMENTS_ONLY=${OWN_ASSIGNMENTS_ONLY:-true}
       - ETH_WALLET_PASSPHRASE=${ETH_WALLET_PASSPHRASE:-}
+      # optional: another wallet than dao.yaml's (one bridge per wallet)
+      - ETH_WALLET_ADDRESS=${ETH_WALLET_ADDRESS:-}
+      - ETH_WALLET_KEYSTORE=${ETH_WALLET_KEYSTORE:-}
       - ROS_ETH_DAO_YAML=/config/dao.yaml
     volumes:
       - ./configs/dao.yaml:/config/dao.yaml:ro

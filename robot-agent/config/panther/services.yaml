@@ -37,3 +37,5 @@ places:
 
 charging:
   max_price_iec: 20         # the most the agent pays for one charging session
+  charge_below_pct: 30      # request charging when the battery drops below this (0 = never)
+  battery_topic: battery/battery_status   # sensor_msgs/BatteryState, relative to the robot's namespace

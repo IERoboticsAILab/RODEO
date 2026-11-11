@@ -35,7 +35,7 @@ class DeliveryValidator(Node):
         try:
             proof = read_proof(req.proof_path)
             task = SimpleNamespace(id=req.task_id, category=req.category, task_type=req.task_type,
-                                   executor=req.executor)
+                                   executor=req.executor, creator=req.creator)
             v = validate(SimpleNamespace(task=task, proof=proof,
                                          service_desc=req.service_description, settings=None))
             res.ok, res.reason, res.lines = bool(v.ok), v.reason[:128], list(v.lines)

@@ -93,20 +93,21 @@ same namespace, configured only by `services.yaml`.
 | When | What it does |
 |---|---|
 | start | Makes the robot's on-chain services match `services.yaml`. It reuses a service whose name, kind, price and description all match, reactivates it if inactive, and otherwise registers a new one, since the contract has no update call. Stale duplicates and own services of kinds not in `services.yaml` are deactivated. It then queues any task assigned to this wallet while the agent was down. |
-| assignment | Reads the task, resolves its parameters against the service's schema (defaults filled in), marks the robot's other services busy, and queues it. Tasks run one at a time. |
+| assignment | Reads the task, resolves its parameters against the service's schema (defaults filled in), takes the robot's other services offline, and queues it. Tasks run one at a time. |
 | execution | Sends `rodeo/execute_task` to the executor, hashes the proof the executor returns, and submits `file://<path>#sha256=<hash>`. |
-| verdict | On `task_verified` / `task_rejected`, frees the other services. The contract frees the task's own service. |
+| verdict | On `task_verified` / `task_rejected`, brings the other services back online. The contract frees the task's own service. |
+| charging | When the battery drops below `charging.charge_below_pct` (from `charging.battery_topic`, a `sensor_msgs/BatteryState`) and the robot is idle, or on a call to `rodeo/request_charging` (`std_srvs/Trigger`): see Charging below. |
 | shutdown | On SIGTERM or SIGINT, deactivates the robot's services, so no task is assigned while it is down. |
 
 It follows the project's assumption that an online robot can finish its tasks.
 A task with invalid parameters, or one the executor fails, is logged and left
 for a person: the contract has no way for the robot to hand a task back.
 
-**Limitation.** Freeing a service with `setBusy(false)` does not make the
-contract look for waiting tasks. A task that queued for one of the robot's
-other services while they were marked busy is assigned at the next contract
-event (a new task, a registration or a completed task). This only matters for
-robots with more than one service.
+While the robot is unavailable (busy with a task, or charging), the agent
+deactivates its other services rather than marking them busy: reactivating a
+service makes the contract assign tasks that waited meanwhile, whereas clearing
+a busy flag does not. A deactivated service is hidden from the task form while
+the robot is away, but tasks posted then still wait on chain.
 
 ### Run it
 
@@ -131,6 +132,11 @@ A robot's executor serves `/<robot>/rodeo/execute_task` and, for each goal:
    `goal.proof_dir`; the writer adds the manifest itself;
 3. returns `success` and the proof's path.
 
+For charging, the executor may also serve `rodeo/dock` (`std_srvs/Trigger`,
+drive onto the charger) and listen on `rodeo/charged`; the robot's battery
+must be published as `sensor_msgs/BatteryState` on the topic named in
+`services.yaml` (the Panther's driver already publishes `battery/battery_status`).
+
 ```python
 from rodeo_agent.proof_writer import ProofWriter
 from rodeo_interfaces.msg import TaskEvent
@@ -150,3 +156,40 @@ the recipient as actor.
 
 `rodeo_agent/fake_executor.py` is a complete example, and the stand-in robot
 used by the demo in `quick-start/`.
+
+## 7. Charging
+
+The charging station takes part like a robot. The institution's wallet runs a
+bridge and the same agent, with `config/station/services.yaml` (an
+Energy/Charging service), and `station_executor` serves its tasks.
+
+When a robot needs energy, its agent:
+
+1. picks the cheapest online charging service within `charging.max_price_iec`;
+2. takes its own services offline, so no task is assigned while it charges;
+3. calls `rodeo/dock` on its executor, if the executor offers it (`std_srvs/Trigger`);
+4. posts a charging task from its own wallet, at **exactly** the station's
+   price (see below), with its name and wallet as parameters;
+5. on the verdict, publishes `rodeo/charged` (`{"task_id", "ok"}` as JSON) and
+   brings its services back online.
+
+The station's executor runs the session and records the station's own
+measurements (`/rodeo/charge`, session start and end naming the paying robot);
+the oracle's charging validator checks the session, the payer and the
+delivered energy against the service's `min_wh`. Today the station executor
+uses a simulated source (`stub_*` settings); a WiBotic source replaces it once
+the transmitter is commissioned.
+
+**Post exactly the price.** At assignment the contract lowers the task's
+reward to the service's price, and the excess of the escrowed reward stays in
+the TaskManager with no way to recover it. The agent therefore always posts the
+station's price. (A contract change to refund the excess is worth raising.)
+
+**Fees.** The contract pays a fixed price per service, so a station can charge
+a flat fee per session today. Options for later:
+
+| Model | How | Contract change |
+|---|---|---|
+| Flat fee per session (now) | one Charging service, one price | none |
+| Energy tiers | several services or task types (e.g. 25 %, 50 %, full), each priced base + rate x energy; the robot picks the smallest tier covering its deficit; the validator checks the tier's energy | none |
+| Metered | settle on delivered energy, refund the rest of the escrow | yes |

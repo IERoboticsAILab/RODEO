@@ -6,6 +6,9 @@ Replaces the ROS 1 ``abi_loader.py``. Resolution order for the config file:
     2. the environment variable ``ROS_ETH_DAO_YAML`` (if non-empty)
     3. ``<share>/ros_eth_bridge/config/dao.yaml`` from the installed package
 
+ETH_WALLET_ADDRESS and ETH_WALLET_KEYSTORE, when set, replace the wallet in the
+file, so one dao.yaml serves several bridges.
+
 Relative ``abi_paths`` entries are resolved against the installed package's
 share directory, so a dao.yaml can say ``abi/TaskManager.json`` instead of a
 container-specific absolute path.
@@ -39,6 +42,12 @@ def resolve_config_path(param_value: str = "") -> str:
 def load_config(path: str) -> BridgeCfg:
     with open(path, "r") as f:
         cfg = BridgeCfg.from_dict(yaml.safe_load(f) or {})
+    # One image, several wallets: ETH_WALLET_ADDRESS / ETH_WALLET_KEYSTORE override
+    # dao.yaml's wallet (e.g. the institution's bridge for the charging station).
+    if os.environ.get("ETH_WALLET_ADDRESS"):
+        cfg.wallet.address = os.environ["ETH_WALLET_ADDRESS"]
+    if os.environ.get("ETH_WALLET_KEYSTORE"):
+        cfg.wallet.keystore_path = os.environ["ETH_WALLET_KEYSTORE"]
     base = share_dir()
     for name in ("iecoin", "organization", "task_manager", "service_manager"):
         p = getattr(cfg.abi_paths, name)

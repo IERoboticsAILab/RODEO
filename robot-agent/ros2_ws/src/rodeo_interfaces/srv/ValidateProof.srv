@@ -6,6 +6,7 @@ uint64 task_id
 string category
 string task_type
 string executor               # wallet address of the robot that did the task
+string creator                # wallet address that posted (and paid for) the task
 string params_json            # task parameters (service defaults filled in)
 string service_description    # the service's on-chain description (JSON: params, places)
 string proof_path             # absolute path of the proof bag
