@@ -13,6 +13,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}   # rmw_cyclonedds_cpp next to a Panther web app
       - OWN_ASSIGNMENTS_ONLY=${OWN_ASSIGNMENTS_ONLY:-true}
       - ETH_WALLET_PASSPHRASE=${ETH_WALLET_PASSPHRASE:-}
       # optional: another wallet than dao.yaml's (one bridge per wallet)

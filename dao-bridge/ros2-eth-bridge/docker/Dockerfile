@@ -6,6 +6,7 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-pip python3-colcon-common-extensions \
+      ros-humble-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # Same library versions as the ROS 1 bridge image. web3 6.11.4 pins

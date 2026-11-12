@@ -38,6 +38,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # same as the Panther's bridge
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}     # same as the Panther's bridge
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}   # same as the Panther's bridge
     stop_grace_period: 30s
     restart: unless-stopped
 
@@ -48,6 +49,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}   # same as the Panther's bridge
       # rodeo: submit the RODEO proof it writes (default)
       # legacy: submit the original ROS 1 waste-demo bag instead (needs LEGACY_PROOFS=1 on the oracle)
       - PROOF_MODE=${PROOF_MODE:-rodeo}

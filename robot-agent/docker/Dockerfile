@@ -8,6 +8,7 @@ SHELL ["/bin/bash", "-c"]
 # rosbag2 with MCAP storage for proof bags
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-rosbag2-py ros-humble-rosbag2-storage-mcap \
+      ros-humble-rmw-cyclonedds-cpp \
       python3-yaml python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 
