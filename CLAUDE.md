@@ -114,15 +114,18 @@ Organization task funds on the Home page.
    and without the fake executor.
 2. **WiBotic source** for `station_executor` (real charging measurements), and
    the fee model (flat now; energy tiers next; see robot-agent/README.md §7).
-3. **MetaMask** in org-web: people sign and pay from their own wallets
-   (approve the TaskManager, then `TaskManager.registerTask`); a Connect wallet
-   control in the header with address and IEC balance. The lab's IEcoin site
-   (iecoin.cyphy.life, with a faucet) is the reference; its network details
-   (RPC URL, chain ID, token address, faucet rules) are still to be collected.
+3. **MetaMask** in org-web: done (MetaMask Connect EVM, `@metamask/connect-evm`;
+   Connect MetaMask in the header, tasks posted and paid from the user's wallet
+   via /tasks/prepare + approve + TaskManager.registerTask, local-chain faucet).
+   The organization's wallet is admin-only: ORG_ADMIN_PIN in the untracked
+   dao-bridge/org-web/.env.admin; unset = wallet-only console.
+   Not yet tried on the lab's IEcoin network (iecoin.cyphy.life): its RPC URL,
+   chain ID and token address are still to be collected.
 4. **Contract issues to raise with Milan**: excess reward above the service
    price is locked in the TaskManager; `Organization.deposit` sets rather than
-   adds the allowance (leftovers and refunds stranded); no way for an executor
-   to hand back a task.
+   adds the allowance (leftovers and refunds stranded); `removeTask` does not
+   refund the escrow and `activateTask` takes the reward again; no way for an
+   executor to hand back a task.
 5. Later: cleanup group C (old oracle scripts; ask Milan about
    smart-contracts/python and templates), TIAGo and drone executors.
 
