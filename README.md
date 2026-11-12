@@ -142,6 +142,7 @@ Or see [DEPLOYMENT-CONFIG.md](DEPLOYMENT-CONFIG.md) for manual update instructio
 
 ```bash
 cd oracle/docker
+cp -n .env.example .env   # first time only: .env is local (not in git)
 nano .env
 ```
 

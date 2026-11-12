@@ -18,6 +18,7 @@ log/
 
 # per-machine config copied from .env.example
 dao-bridge/ros2-eth-bridge/docker/.env
+oracle/docker/.env
 
 # proofs written by executors (task<id>_<robot>_<time>/)
 oracle/proofs/task[0-9]*_*/

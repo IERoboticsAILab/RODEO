@@ -83,8 +83,9 @@ scripts/              update-addresses.sh
   SIGTERM to launch left the agent running and skipped its shutdown.
 - Several compose files live in folders named `docker`; never use `--remove-orphans`.
 - Local-only files: `blockchain-network/ganache-docker/docker-compose.override.yml`
-  (chain in `ganache_db_local`), and uncommitted address edits in
-  `oracle/docker/.env`, `dao-bridge/org-web/.env`, `deployments/1337.json`.
+  (chain in `ganache_db_local`), `oracle/docker/.env` (not tracked; copied from
+  `.env.example`), and uncommitted address edits in `dao-bridge/org-web/.env`,
+  `deployments/1337.json`.
   Don't commit or overwrite them unless asked.
 - `oracle/oracle_node/power_csv.py` and `oracle/docker/.env` have CRLF line endings.
 - The contract only re-matches waiting tasks on contract events; setBusy(false)
@@ -131,8 +132,8 @@ Organization task funds on the Home page.
 
 ## Working with Samuel's checkout
 
-- `oracle/docker/.env`, `dao-bridge/org-web/.env` and
-  `deployments/1337.json` carry the fresh-chain addresses (committed on
-  rodeo-v2). `oracle/docker/.env` may have uncommitted local edits.
+- `dao-bridge/org-web/.env` and `deployments/1337.json` carry the fresh-chain
+  addresses (committed on rodeo-v2). `oracle/docker/.env` is local only (ignored;
+  holds the oracle key): copy it from `oracle/docker/.env.example`.
 - Commit only the files a change touches (`git commit <paths>`), never `-a`.
 - The Ganache chain lives in `ganache_db_local` via a local override file.
