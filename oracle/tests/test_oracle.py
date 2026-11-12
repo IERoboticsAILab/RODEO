@@ -79,8 +79,6 @@ def test_good_delivery_passes():
     ({}, {"params": dict(PARAMS, dropoff="samuel_desk")}, "proof parameters do not match the task"),
     ({}, {"drop_xy": (DROP[0] + 5, DROP[1])}, "robot was not at the drop-off place"),
     ({}, {"unload": False}, "package was not unloaded at the drop-off place"),
-    ({}, {"confirm_by": None}, "receipt not confirmed at the drop-off place"),
-    ({}, {"confirm_by": "someone else"}, "receipt confirmed by someone else"),
     ({}, {"load_kg": 0.0}, "no package was loaded at the pick-up place"),
 ])
 def test_bad_deliveries_rejected(t_kw, p_kw, reason):

@@ -155,8 +155,7 @@ result = ExecuteTask.Result(success=True, proof_path=proof.path)
 What the oracle then checks is in `oracle/README.md`. For a delivery, record:
 ARRIVE and DEPART events with place ids; poses while moving and at each stop;
 stable weight readings at the start, at the pick-up after loading, and at the
-drop-off before and after unloading; and a CONFIRM event at the drop-off with
-the recipient as actor.
+drop-off before and after unloading. No CONFIRM event is needed.
 
 `rodeo_agent/fake_executor.py` is a complete example, and the stand-in robot
 used by the demo in `quick-start/`.

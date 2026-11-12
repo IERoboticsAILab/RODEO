@@ -56,7 +56,7 @@ Chosen by the task's category and task type. The rules live in
 | Service | Validator | Checks |
 |---|---|---|
 | Energy / Charging | `charging.py` | a complete session (start and end) for the robot that posted and paid for the task; energy integrated from the station's voltage and current samples at least the service's `min_wh`; active charging seen |
-| Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`, declared weight if given); receipt confirmed at drop-off by the named recipient |
+| Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`, declared weight if given). No recipient confirmation is needed |
 
 A new service gets a validator by:
 

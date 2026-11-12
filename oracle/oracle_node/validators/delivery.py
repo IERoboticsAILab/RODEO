@@ -11,13 +11,13 @@ description:
              DELIVERY_MIN_PACKAGE_KG added at pick-up, still loaded on arrival at
              drop-off, empty again after drop-off (all within DELIVERY_WEIGHT_TOL_KG);
              matches declared_weight_kg if the task gave one
-    receipt  someone confirmed at the drop-off place after the robot arrived;
-             if the task names a recipient, it was that person
+
+No recipient confirmation is required: unloading at the drop-off place (deck
+weight falls) is the evidence of delivery. CONFIRM events, if any, are ignored.
 
 What an executor must record for this to pass: ARRIVE/DEPART events with place
 ids, poses while moving and at stops, stable weight readings at the start, at
-pick-up after loading, at drop-off before and after unloading, and a CONFIRM
-event with the recipient as actor.
+pick-up after loading, and at drop-off before and after unloading.
 """
 from __future__ import annotations
 
@@ -107,13 +107,4 @@ def validate(ctx) -> Verdict:
         v.check(abs(loaded - float(declared)) <= d_tol,
                 f"matches declared weight {float(declared):.3f} kg (tol {d_tol:.3f})",
                 "package weight differs from the declared weight")
-
-    # ------------------------------------------------------------ receipt
-    conf = _first_event(proof, "confirm", drop_id, after=arr_drop.t)
-    v.check(conf is not None, f"receipt confirmed at '{drop_id}'" + (f" by '{conf.actor}'" if conf else ""),
-            "receipt not confirmed at the drop-off place")
-    recipient = (params.get("recipient") or "").strip()
-    if conf is not None and recipient:
-        v.check(conf.actor.strip().lower() == recipient.lower(),
-                f"confirmed by the named recipient '{recipient}'", "receipt confirmed by someone else")
     return v
