@@ -36,7 +36,7 @@ def task(**kw):
     return NS(**d)
 
 
-def proof(params=PARAMS, task_id=7, drop_xy=DROP, unload=True, confirm_by="the recipient", load_kg=1.2):
+def proof(params=PARAMS, task_id=7, drop_xy=DROP, unload=True, load_kg=1.2):
     p = RodeoProof()
     p.manifests.append(NS(format_version=1, task_id=task_id, executor=WALLET, robot="panther",
                           category="Logistics", task_type="ItemTransport", params_json=json.dumps(params)))
@@ -45,8 +45,6 @@ def proof(params=PARAMS, task_id=7, drop_xy=DROP, unload=True, confirm_by="the r
         (3, "w", 0.0), (4, "w", load_kg), (5, "ev", ("depart", "package_pickup", "")),
         (9, "pose", drop_xy), (9, "ev", ("arrive", params.get("dropoff", ""), "")),
         (10, "w", load_kg), (11, "w", 0.0 if unload else load_kg)]
-    if confirm_by:
-        seq.append((12, "ev", ("confirm", params.get("dropoff", ""), confirm_by)))
     for dt, kind, data in seq:
         t = T0 + dt
         p.log_times.append(t)

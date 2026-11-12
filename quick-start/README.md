@@ -14,8 +14,7 @@ Station:  bridge (institution wallet)  ←→  agent  ←→  station executor (
   hashes the proof and submits it, and handles the oracle's verdict.
 - The **fake executor** serves `rodeo/execute_task` like a real robot would: in
   about 15 s it "drives" to the pick-up place, loads, drives to the drop-off
-  place, unloads and records the recipient's confirmation, writing a standard
-  RODEO proof bag along the way.
+  place and unloads, writing a standard RODEO proof bag along the way.
 
 It uses the Panther's `services.yaml` (Delivery service, nine lab places), so a
 task runs exactly as it will on the Panther, minus the driving. Each delivery

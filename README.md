@@ -287,7 +287,7 @@ Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
    2.1 Connect MetaMask (top right; on the local chain, **Get test funds** gives a new wallet IEC and gas), or unlock the admin on the Home page with the PIN from `dao-bridge/org-web/.env.admin` to post as the organization. Then navigate to the Tasks tab, give the task a Name, choose Category **Logistics** and Type **ItemTransport (Delivery)** (only services that are online are listed; the price fills in), choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. When the organization pays and its task funds run low, deposit more on the Home page (**Organization (admin)**).
 
    2.2 After creating the task you will notice that it has been assigned to the robot wallet.
-3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload, recipient confirmation.
+3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload.
 4. The agent hashes the proof and submits it.
 5. On the oracle terminal you can see the new proof being validated: first the checks every proof must pass (hash, reuse, manifest, parameters, time window), then the delivery validator. In the end you will see:
 ```
@@ -300,7 +300,6 @@ rodeo-oracle  |   OK    recorded +1.2 s .. +0.2 s relative to assignment/submiss
 rodeo-oracle  |   OK    pose at pick-up arrival 0.00 m from 'package_pickup' (max 1.00 m)
 rodeo-oracle  |   OK    package loaded at pick-up: 1.200 kg (min 0.05)
 rodeo-oracle  |   OK    deck empty after drop-off: 0.000 kg
-rodeo-oracle  |   OK    receipt confirmed at 'package_dropoff' by 'the recipient'
 rodeo-oracle  | APPROVED
 rodeo-oracle  | Approved task 1
 rodeo-oracle  | Task 1 verified
@@ -315,7 +314,7 @@ rodeo-demo-agent     | ready - waiting for assignments
 rodeo-demo-agent     | task 1 assigned (reward 100 IEC)
 rodeo-demo-agent     | task 1: executing Delivery with {"dropoff": "package_dropoff", "pickup": "package_pickup", ...}
 rodeo-demo-executor  | task 1: to_pickup - package_pickup
-rodeo-demo-executor  | task 1: waiting_confirm - the recipient takes the package and confirms
+rodeo-demo-executor  | task 1: waiting_unload - the recipient takes the package
 rodeo-demo-agent     | task 1: submit proof: ok (block 15)
 rodeo-demo-agent     | task 1: VERIFIED - reward paid
 ```

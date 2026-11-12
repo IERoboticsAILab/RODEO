@@ -9,7 +9,7 @@ commits; push only when asked.
 Any robot (the Husarion Panther now; TIAGo and drones later) joins the RODEO
 marketplace by declaring its services and implementing one standard action.
 RODEO itself never contains robot-specific code. Use case 1: the Panther
-delivers a package between two named places and the recipient confirms.
+delivers a package between two named places.
 
 ## Architecture (agreed with Milan)
 
@@ -39,7 +39,7 @@ delivers a package between two named places and the recipient confirms.
 - Busy flags are per service; the agent marks the robot's other services busy
   while one runs and frees them at the verdict.
 - Agent deactivates its services on shutdown; crashes are handled by a person.
-- Delivery proof = poses + events + deck weight + recipient confirmation.
+- Delivery proof = poses + events + deck weight (no recipient confirmation).
   Trust in robot-reported data is out of scope for now.
 - Legacy proofs (ROS 1 .bag, .csv) still accepted while `LEGACY_PROOFS=1`
   (they are not bound to a task).

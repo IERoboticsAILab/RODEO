@@ -5,7 +5,7 @@ fake_executor - stands in for a robot's executor: serves rodeo/execute_task,
 
 For a task with pickup/dropoff places it records a delivery: drive to the
 pick-up place, announce, load (weight rises), drive to the drop-off place,
-announce, unload (weight falls), recipient confirms. Poses use the places'
+announce, unload (weight falls). Poses use the places'
 coordinates from services.yaml. Any other task gets a short generic proof.
 
 Parameters
@@ -174,10 +174,9 @@ class FakeExecutor(Node):
         self._drive(proof, pick, drop)
         proof.event(TaskEvent.ARRIVE, place=p["dropoff"])
         proof.event(TaskEvent.SAY, place=p["dropoff"], text=f"Package for {recipient} from {sender}")
-        self._stage(gh, "waiting_confirm", f"{recipient} takes the package and confirms")
+        self._stage(gh, "waiting_unload", f"{recipient} takes the package")
         self._hold(proof, drop, kg)
         self._hold(proof, drop, 0.0)
-        proof.event(TaskEvent.CONFIRM, place=p["dropoff"], actor=recipient)
         proof.event(TaskEvent.DEPART, place=p["dropoff"])
 
     def _generic(self, gh, proof):
