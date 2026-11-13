@@ -133,6 +133,13 @@ volumes:
 
 ---
 
+## Logs
+
+```bash
+docker logs smart-contract-deployer      # the deployment run and the contract addresses
+docker logs -f ganache                   # the chain it deploys to
+```
+
 ## See Also
 
 - [Smart Contracts README](../README.md) - Deployment options overview

@@ -32,6 +32,8 @@ docker-compose down
 
 # View logs
 docker logs ganache
+docker logs -f ganache              # follow live
+docker logs --since 10m ganache
 
 # Reset blockchain (delete all state)
 docker-compose down && rm -rf ganache_db/

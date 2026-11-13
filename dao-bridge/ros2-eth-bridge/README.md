@@ -66,6 +66,19 @@ docker compose up -d --build
 docker logs -f ros2-eth-bridge  # expect "dao_listener ready" and "dao_writer ready"
 ```
 
+- The passphrase must be the one the keystore was made with. With an empty dev
+  passphrase, leave `ETH_WALLET_PASSPHRASE` unset. A wrong one stops
+  `dao_writer` at start with `EthKeyfileValueError: MAC mismatch`. `dao_listener`
+  keeps running, so tasks are still assigned, but no proof can be submitted
+  (`dao/submit_proof_action not available` in the agent).
+- `RMW_IMPLEMENTATION` (default `rmw_fastrtps_cpp`; the image also has
+  `rmw_cyclonedds_cpp`) must match the robot's agent and executor. For example,
+  `ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+  docker compose up -d --force-recreate` runs next to the Panther web app.
+
+Logs: `docker logs -f ros2-eth-bridge`, `docker logs --since 10m ros2-eth-bridge`,
+`docker logs ros2-eth-bridge 2>&1 | grep -iE "ready|error|traceback"`.
+
 ### Acceptance test: the demo
 
 The demo in `quick-start/` (the RODEO agent plus a fake executor) exercises

@@ -75,6 +75,32 @@ battery, run
 `./demo.sh stop` stops both containers; the agent deactivates its service
 first, so no new task is assigned while it is down.
 
+## A real robot instead of the fake executor
+
+Stop the fake executor and recreate the agent, and the robot's bridge, on the
+real executor's domain, namespace and DDS. The Panther web app uses domain 41
+(real robot) or 42 (Gazebo twin), namespace `panther`, and CycloneDDS.
+
+```bash
+docker compose stop fake-executor
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  docker compose up -d --no-deps --force-recreate agent
+```
+
+The same three variables go to the bridge in `dao-bridge/ros2-eth-bridge/docker`,
+started first. The station containers can stay on the default domain. The
+Panther's executor and its runbook are in the web app repo (branch `webapp` of
+husarion-ugv-autonomy, `README_rodeo_executor.md`).
+
+## Logs
+
+```bash
+./demo.sh logs                              # all demo containers
+docker compose logs -f agent                # one service: agent, fake-executor, station-bridge, station-agent, station-executor
+docker logs -f rodeo-demo-agent             # by container name
+docker logs --since 10m rodeo-demo-station-executor
+```
+
 ## Settings
 
 | Setting | Default | Notes |

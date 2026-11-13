@@ -127,6 +127,25 @@ The agent runs as the container's main process, not through `ros2 launch`, so
 30 s). The proof folder `oracle/proofs/` is mounted at `/root/oracle/proofs`
 in the agent, the executors and the oracle.
 
+**Next to a real executor:** the agent, the robot's bridge and the executor must
+share `ROS_DOMAIN_ID`, `ROBOT_NAMESPACE` and `RMW_IMPLEMENTATION`. The image
+includes CycloneDDS; set `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` when the executor
+uses it (the Panther web app does). With different DDS on each side, goals arrive
+garbled. If the executor runs outside a container, it must write proofs into the
+same folder and return the path as the agent sees it (`/root/oracle/proofs/...`).
+Start the bridge first: the agent exits after 60 s without one ("bridge not found").
+
+### Logs
+
+```bash
+docker logs -f rodeo-agent              # this compose; rodeo-demo-agent in quick-start
+docker logs --since 10m rodeo-agent
+```
+
+The agent logs registration, "ready - waiting for assignments", each assignment,
+the executor's stages, the proof submission, and the verdict (VERIFIED/REJECTED
+with the reason).
+
 ### Writing an executor
 
 A robot's executor serves `/<robot>/rodeo/execute_task` and, for each goal:

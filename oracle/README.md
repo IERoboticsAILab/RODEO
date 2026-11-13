@@ -118,7 +118,7 @@ ORACLE_PRIVATE_KEY=0x...
 ./oracle-docker.sh start
 
 # View logs
-./oracle-docker.sh logs
+./oracle-docker.sh logs           # or: docker logs -f rodeo-oracle
 ```
 
 ### 3. Verify Running

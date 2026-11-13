@@ -19,7 +19,8 @@ The oracle supports two configuration methods:
 
 ### Method 1: Environment Variables (.env file) - Recommended
 
-1. Copy the example configuration:
+1. Copy the example configuration. `.env` is local: it holds the oracle key and
+   is not in git.
    ```bash
    cp .env.example .env
    ```
@@ -79,7 +80,12 @@ To view logs:
 docker compose logs -f oracle
 # or
 ./oracle-docker.sh logs
+docker logs -f rodeo-oracle               # by container name, from anywhere
+docker logs --since 10m rodeo-oracle
 ```
+
+The oracle code is copied into the image, so rebuild after changing a validator:
+`docker compose up -d --build oracle`.
 
 You should see:
 ```

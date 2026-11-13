@@ -88,6 +88,7 @@ docker-compose up -d
 
 # View logs
 docker-compose logs -f
+docker logs -f org-web-console     # by container name, from anywhere
 
 # Stop
 docker-compose down

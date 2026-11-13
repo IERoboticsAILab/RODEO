@@ -326,6 +326,64 @@ Monitor the oracle logs to see the validation process:
 docker logs -f rodeo-oracle
 ```
 
+### Step 8 (optional): a real robot instead of the fake executor
+
+A real robot replaces the fake executor with its own executor: something that
+serves `rodeo/execute_task` (`rodeo_interfaces/action/ExecuteTask`) in the
+robot's namespace and writes the proof with `rodeo_agent.proof_writer.ProofWriter`.
+The Panther's executor lives in its web app (branch `webapp` of
+[husarion-ugv-autonomy](https://github.com/Awai005/husarion-ugv-autonomy/tree/webapp),
+`README_rodeo_executor.md`). It has delivered org-web tasks in a Gazebo twin and
+on the real Panther, verified by the oracle and paid.
+
+The robot's bridge, its agent and its executor must share:
+- **`ROS_DOMAIN_ID`**: the executor's domain, e.g. 42 for the Gazebo twin, 41 for
+  the Panther's web app;
+- **`ROBOT_NAMESPACE`**: `panther`;
+- **`RMW_IMPLEMENTATION`**: `rmw_cyclonedds_cpp` next to the Panther web app. The
+  images include CycloneDDS; the default stays Fast DDS.
+
+The proof folder must be the same for all of them: `oracle/proofs`, mounted at
+`/root/oracle/proofs`.
+
+```bash
+cd quick-start/docker && docker compose stop fake-executor
+cd ../../dao-bridge/ros2-eth-bridge/docker
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --force-recreate
+cd ../../../quick-start/docker
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --no-deps --force-recreate agent
+```
+
+Start the bridge before the agent; the agent gives up after 60 s without one.
+The oracle and the charging station stay on their own domain, since they only
+talk through the chain.
+
+## Logs
+
+Every component runs in a container, and `docker logs` shows what it is doing:
+
+```bash
+docker logs -f <container>                 # follow live (Ctrl-C to stop)
+docker logs --tail 50 <container>          # last 50 lines
+docker logs --since 10m <container>        # last 10 minutes
+docker logs <container> 2>&1 | grep -i error
+docker compose logs -f <service>           # the same, from the compose folder, by service name
+```
+
+| Container | Started from | What to look for |
+|---|---|---|
+| `ganache` | `blockchain-network/ganache-docker` | blocks and transactions |
+| `smart-contract-deployer` | `blockchain-network/smart-contracts/docker` | the deployed addresses |
+| `rodeo-oracle` | `oracle/docker` | one validation summary per task, then APPROVED/REJECTED |
+| `ros2-eth-bridge` | `dao-bridge/ros2-eth-bridge/docker` | `dao_listener ready`, `dao_writer ready`; a Traceback with "MAC mismatch" = wrong wallet passphrase |
+| `org-web-console` | `dao-bridge/org-web` | the backend's config and chain connection |
+| `rodeo-demo-agent` | `quick-start/docker` | service registered, "ready", task assigned, stages, submit proof, VERIFIED/REJECTED |
+| `rodeo-demo-executor` | `quick-start/docker` | the fake executor's stages |
+| `rodeo-demo-station-bridge`, `-agent`, `-executor` | `quick-start/docker` | the charging station |
+| `rodeo-agent` | `robot-agent/docker` | a single robot's agent (outside the demo) |
+
+`./demo.sh logs` in `quick-start/docker` follows the whole demo.
+
 ## System Requirements
 
 ### Minimum Requirements
