@@ -96,10 +96,17 @@ def test_time_window_and_hash_and_reuse():
 
 
 def test_declared_weight():
-    d = json.dumps({"v": 1, "params": {"declared_weight_kg": 2.0}, "note": ""})
-    params = dict(PARAMS, declared_weight_kg=2.0)
-    assert not run(task(description=d), proof(params=params)).ok          # carried 1.2 kg, declared 2.0
-    assert run(task(description=d), proof(params=params, load_kg=2.0)).ok
+    # default DELIVERY_DECLARED_TOL_FRAC=0.5: a declared 1 kg passes for 0.5-1.5 kg
+    d = json.dumps({"v": 1, "params": {"declared_weight_kg": 1.0}, "note": ""})
+    params = dict(PARAMS, declared_weight_kg=1.0)
+    for kg in (0.5, 1.0, 1.2, 1.5):
+        assert run(task(description=d), proof(params=params, load_kg=kg)).ok, kg
+    for kg in (0.45, 1.55):
+        v = run(task(description=d), proof(params=params, load_kg=kg))
+        assert not v.ok and v.reason == "package weight differs from the declared weight", kg
+    d3 = json.dumps({"v": 1, "params": {"declared_weight_kg": 3.0}, "note": ""})
+    params3 = dict(PARAMS, declared_weight_kg=3.0)
+    assert not run(task(description=d3), proof(params=params3)).ok        # carried 1.2 kg, declared 3.0
 
 
 def test_legacy_waste_bags():

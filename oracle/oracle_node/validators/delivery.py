@@ -10,7 +10,9 @@ description:
     load     stable deck readings: empty before pick-up, at least
              DELIVERY_MIN_PACKAGE_KG added at pick-up, still loaded on arrival at
              drop-off, empty again after drop-off (all within DELIVERY_WEIGHT_TOL_KG);
-             matches declared_weight_kg if the task gave one
+             matches declared_weight_kg if the task gave one, within
+             DELIVERY_DECLARED_TOL_FRAC of it (default 0.5: a declared 1 kg passes
+             for 0.5-1.5 kg)
 
 No recipient confirmation is required: unloading at the drop-off place (deck
 weight falls) is the evidence of delivery. CONFIRM events, if any, are ignored.
@@ -50,6 +52,7 @@ def validate(ctx) -> Verdict:
     radius = _f("DELIVERY_PLACE_RADIUS_M", "1.0")
     tol = _f("DELIVERY_WEIGHT_TOL_KG", "0.1")
     min_pkg = _f("DELIVERY_MIN_PACKAGE_KG", "0.05")
+    decl_frac = _f("DELIVERY_DECLARED_TOL_FRAC", "0.5")
     proof, v = ctx.proof, Verdict(ok=True)
 
     params = proof.params
@@ -103,8 +106,10 @@ def validate(ctx) -> Verdict:
             "package was not unloaded at the drop-off place")
     declared = params.get("declared_weight_kg")
     if declared not in (None, ""):
-        d_tol = max(tol, 0.1 * float(declared))
-        v.check(abs(loaded - float(declared)) <= d_tol,
-                f"matches declared weight {float(declared):.3f} kg (tol {d_tol:.3f})",
+        decl = float(declared)
+        d_tol = max(tol, decl_frac * decl)
+        v.check(abs(loaded - decl) <= d_tol + 1e-9,
+                f"loaded {loaded:.3f} kg matches declared {decl:.3f} kg "
+                f"(allowed {decl - d_tol:.3f}-{decl + d_tol:.3f})",
                 "package weight differs from the declared weight")
     return v
