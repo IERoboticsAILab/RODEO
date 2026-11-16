@@ -40,6 +40,7 @@ const TASK_MANAGER_ABI = [
   "function registerTask(string description, string category, string taskType, uint256 reward) returns (uint256)",
   "function removeTask(uint256 taskId)",
   "function activateTask(uint256 taskId)",
+  "function unassignTask(uint256 taskId)",
 ];
 
 const hexChain = (id: number) => `0x${id.toString(16)}` as `0x${string}`;
@@ -65,6 +66,7 @@ type WalletApi = WalletState & {
   // creator-only actions on a task this wallet posted
   removeTask: (taskId: number) => Promise<string>;
   activateTask: (taskId: number, rewardWei: string) => Promise<string>;
+  unassignTask: (taskId: number) => Promise<string>;
   requestFaucet: () => Promise<string>;
 };
 
@@ -246,6 +248,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return tx.hash as string;
   }, [signerFor, refresh]);
 
+  const unassignTask = useCallback(async (taskId: number) => {
+    // frees the robot's service, refunds the reward to the creator, deactivates the task
+    const { config, signer } = await signerFor();
+    const tm = new Contract(config.taskManager, TASK_MANAGER_ABI, signer);
+    const tx = await tm.unassignTask(taskId);
+    await tx.wait();
+    await refresh();
+    return tx.hash as string;
+  }, [signerFor, refresh]);
+
   const requestFaucet = useCallback(async () => {
     const { address } = stateRef.current;
     if (!address) throw new Error("connect a wallet first");
@@ -259,8 +271,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     ...s,
     connected: !!s.address,
     onRightChain: !!s.address && !!s.config && s.chainId === s.config.chainId,
-    connect, disconnect, switchNetwork, refresh, postTask, removeTask, activateTask, requestFaucet,
-  }), [s, connect, disconnect, switchNetwork, refresh, postTask, removeTask, activateTask, requestFaucet]);
+    connect, disconnect, switchNetwork, refresh, postTask, removeTask, activateTask, unassignTask, requestFaucet,
+  }), [s, connect, disconnect, switchNetwork, refresh, postTask, removeTask, activateTask, unassignTask, requestFaucet]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

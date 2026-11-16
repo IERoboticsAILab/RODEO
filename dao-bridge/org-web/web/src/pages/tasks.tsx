@@ -2,14 +2,17 @@
 import { useEffect, useState } from "react";
 import Shell from "../components/Shell";
 import { CreateTaskForm, TaskRequest } from "../components/Forms";
-import TaskTable from "../components/TaskTable";
-import { createTask, deleteTask, fetchTasks, activateTask, fetchCatalog, prepareTask, fetchTasksByCreator } from "../lib/api";
+import TaskTable, { type TaskAction } from "../components/TaskTable";
+import { createTask, deleteTask, fetchTasks, activateTask, unassignTask, fetchCatalog, prepareTask, fetchTasksByCreator } from "../lib/api";
 import { shortAddress, useWallet } from "../lib/wallet";
 import { useAdmin } from "../lib/admin";
 import useSWR from "swr";
 
 type Payer = "wallet" | "org";
 
+const UNASSIGN_WARNING = (id: number | string) =>
+  `Unassign task ${id}? The robot's service is freed, the reward is refunded to the creator, ` +
+  `and the task becomes inactive; Activate posts it again.`;
 const REMOVE_WARNING = (id: number | string) =>
   `Remove task ${id}? The contract does not refund its reward, and reactivating it later takes the reward again.`;
 
@@ -46,8 +49,11 @@ export default function TasksPage() {
   }
 
   // tasks this wallet posted: only the wallet may remove or reactivate them
-  async function walletAction(id: number | string, action: "remove" | "activate") {
-    if (action === "remove") {
+  async function walletAction(id: number | string, action: TaskAction) {
+    if (action === "unassign") {
+      if (!window.confirm(UNASSIGN_WARNING(id))) return;
+      await wallet.unassignTask(Number(id));
+    } else if (action === "remove") {
       if (!window.confirm(REMOVE_WARNING(id))) return;
       await wallet.removeTask(Number(id));
     } else {
@@ -58,8 +64,11 @@ export default function TasksPage() {
   }
 
   // the organization's tasks: signed by the console (admin PIN required)
-  async function orgAction(id: number | string, action: "remove" | "activate") {
-    if (action === "remove") {
+  async function orgAction(id: number | string, action: TaskAction) {
+    if (action === "unassign") {
+      if (!window.confirm(UNASSIGN_WARNING(id))) return;
+      await unassignTask(Number(id));
+    } else if (action === "remove") {
       if (!window.confirm(REMOVE_WARNING(id))) return;
       await deleteTask(Number(id));
     } else {

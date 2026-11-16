@@ -2,9 +2,9 @@
 import Shell from "../components/Shell";
 import Link from "next/link";
 import useSWR from "swr";
-import { fetchAll,  deleteService, deleteTask, activateService, activateTask, setServiceBusy, fetchTokenHolders } from "../lib/api";
+import { fetchAll,  deleteService, deleteTask, activateService, activateTask, unassignTask, setServiceBusy, fetchTokenHolders } from "../lib/api";
 import ServiceTable from "../components/ServiceTable";
-import TaskTable from "../components/TaskTable";
+import TaskTable, { type TaskAction } from "../components/TaskTable";
 import { TaskFunds } from "../components/Forms";
 import AdminBox from "../components/AdminBox";
 import { fetchOrgFunds, depositOrgFunds } from "../lib/api";
@@ -38,8 +38,11 @@ export default function Home() {
   await mutate();
 }
 
-  async function handleTaskAction(id: number | string, action: "remove" | "activate") {
-  if (action === "remove") {
+  async function handleTaskAction(id: number | string, action: TaskAction) {
+  if (action === "unassign") {
+    if (!window.confirm(`Unassign task ${id}? The robot's service is freed, the reward is refunded to the creator, and the task becomes inactive; Activate posts it again.`)) return;
+    await unassignTask(Number(id));
+  } else if (action === "remove") {
     await deleteTask(Number(id));
   } else if (action === "activate") {
     await activateTask(Number(id));

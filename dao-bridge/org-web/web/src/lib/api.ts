@@ -121,6 +121,7 @@ export const depositOrgFunds = (amountIec: number) =>
     method: "POST", headers: jsonHeaders(), body: JSON.stringify({ amountIec }) }));
 export const deleteTask = (id: number) => api.tasks.remove(id);
 export const activateTask = (id: number) => api.tasks.activate(id);
+export const unassignTask = (id: number) => api.tasks.unassign(id);
 
 // mirrors for services pages
 //export const fetchServices = async () => {

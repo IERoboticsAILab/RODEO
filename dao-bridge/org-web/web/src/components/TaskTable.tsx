@@ -37,10 +37,14 @@ const badgeStyle = (bg: string): React.CSSProperties => ({
   color: "#111827",           // readable dark text
 });
 
+// an assigned task (e.g. one the robot failed) is unassigned first: that frees the
+// robot's service, refunds the creator and deactivates the task
+export type TaskAction = "remove" | "activate" | "unassign";
+
 export default function TaskTable({
   rows,
   onAction,
-}: { rows: TaskRow[]; onAction?: (id: number, action: "remove" | "activate") => void }) {
+}: { rows: TaskRow[]; onAction?: (id: number, action: TaskAction) => void }) {
   return (
     <div className="card overflow-x-auto">
       <table className="table">
@@ -69,8 +73,8 @@ export default function TaskTable({
                 : row.rewardWei != null
                 ? formatUnitsString(row.rewardWei, 18, 4)
                 : "0";
-                const action = row.active ? "remove" : "activate";
-                const label = row.active ? "Deactivate" : "Activate";
+                const action: TaskAction = row.status === 1 ? "unassign" : row.active ? "remove" : "activate";
+                const label = row.status === 1 ? "Unassign" : row.active ? "Deactivate" : "Activate";
             return (
               <tr key={row.id} className="tr">
                 <td className="td">{row.id}</td>

@@ -127,6 +127,9 @@ Organization task funds on the Home page.
    adds the allowance (leftovers and refunds stranded); `removeTask` does not
    refund the escrow and `activateTask` takes the reward again; no way for an
    executor to hand back a task.
+   `TaskManager.unassignTask` has no sender check: anyone can unassign any
+   assigned task (org-web's Unassign button uses it for wallet-posted tasks,
+   `Organization.unassignTask` for the organization's).
 5. Later: cleanup group C (old oracle scripts; ask Milan about
    smart-contracts/python and templates), TIAGo and drone executors.
 
