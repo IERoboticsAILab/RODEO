@@ -32,8 +32,8 @@ places:
   ee_server_room:  {label: "EE room / Server room", waypoint: G,  xy: [1.885, -17.181]}
   package_pickup:  {label: "Package pick up",      waypoint: H,  xy: [2.893, -24.206]}
   package_dropoff: {label: "Package drop off",     waypoint: K,  xy: [-3.584, 13.735]}
-  mech_room:       {label: "Mech room",            waypoint: C1, xy: [1.879, -6.014]}
-  office:          {label: "Office",               waypoint: E1, xy: [1.849, -4.563]}
+  mech_room:       {label: "Mech room",            waypoint: C1, xy: [1.779, -6.014]}
+  office:          {label: "Office",               waypoint: E1, xy: [1.749, -4.563]}
 
 charging:
   max_price_iec: 20         # the most the agent pays for one charging session
