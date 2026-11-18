@@ -60,6 +60,19 @@ deactivates the task (Activate posts it again). The robot's agent sees
 `TaskUnassigned` and cancels the run. A proof submitted in time is still verified
 after the deadline. Only block times are compared.
 
+Contracts without these functions (the IE Coin contracts on OP Sepolia): the
+sweeper turns itself off and org-web keeps the limits instead
+(`dao-bridge/org-web/backend/task_timer.py`, `ORG_TASK_TIMEOUTS`).
+
+### Public chains (OP Sepolia)
+
+The oracle reads events with plain `eth_getLogs` over block ranges, never
+`eth_newFilter`: public, load-balanced RPCs lose filters between requests.
+`START_BLOCK` is the contracts' first block (OP Sepolia `51608886`); `LOG_CHUNK`
+(default 10000, the public RPC's limit) is the most blocks one query covers.
+`MIN_GAS_PRICE` defaults to 1 gwei for Ganache; on OP Sepolia use about 0.001 gwei
+(`1000000`), see `docker/.env.opsepolia.example`.
+
 ### Validators
 
 Chosen by the task's category and task type. The rules live in

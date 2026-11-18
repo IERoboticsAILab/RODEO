@@ -19,12 +19,14 @@ x-oracle-env: &oracle_env
   - BASE_ABI=/workspace/abi
   - TASK_MANAGER_NAME=TaskManager
   # Gas
-  - MIN_GAS_PRICE=1000000000
+  - MIN_GAS_PRICE=${MIN_GAS_PRICE:-1000000000}   # wei; OP Sepolia: far lower (see .env.opsepolia.example)
   - GAS_MULTIPLIER=1.2
   # Validation
   - CLOCK_TOLERANCE_SEC=${CLOCK_TOLERANCE_SEC:-5}
   - CLOCK_CHECK=${CLOCK_CHECK:-duration}     # duration: no clock sync needed; absolute: old check
   - EXPIRE_EVERY_SEC=${EXPIRE_EVERY_SEC:-15} # send expireTask for tasks past their time limit (0 = off)
+  - START_BLOCK=${START_BLOCK:-0}            # first block of the contracts' events (OP Sepolia 51608886)
+  - LOG_CHUNK=${LOG_CHUNK:-10000}            # most blocks per log query (public RPC limit)
   - LEGACY_PROOFS=${LEGACY_PROOFS:-1}        # 0: refuse ROS 1 .bag / .csv proofs
   - STATE_DIR=/workspace/state               # hashes of proofs already used
   - POS_EPS=0.002                            # waste-demo validator (legacy ROS 1 bags)

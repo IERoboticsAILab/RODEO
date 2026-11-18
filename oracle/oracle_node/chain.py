@@ -36,6 +36,14 @@ class Task:
                     bool(t[10]), t[11] or "", t[12], bool(t[13]))
 
 
+def _get_logs(event, from_block: int, to_block: int, argument_filters=None) -> list:
+    """event.get_logs over a block range, for web3 6 (fromBlock) and 7 (from_block)."""
+    try:
+        return event.get_logs(fromBlock=from_block, toBlock=to_block, argument_filters=argument_filters)
+    except TypeError:
+        return event.get_logs(from_block=from_block, to_block=to_block, argument_filters=argument_filters)
+
+
 class ChainClient:
     def __init__(self, web3: Web3, settings):
         self.web3 = web3
@@ -134,13 +142,23 @@ class ChainClient:
             print("  None")
 
     def _last_event_time(self, event, task_id: int, before_block=None):
-        logs = event.get_logs(fromBlock=0, argument_filters={"taskId": task_id})
-        if before_block is not None:
-            logs = [lg for lg in logs if lg["blockNumber"] <= before_block]
-        if not logs:
-            return None, None
-        last = max(logs, key=lambda lg: (lg["blockNumber"], lg["logIndex"]))
-        return int(self.web3.eth.get_block(last["blockNumber"])["timestamp"]), last["blockNumber"]
+        """
+        Block time and number of the task's last ``event`` at or before
+        ``before_block``. Searches backwards from there in chunks of LOG_CHUNK
+        blocks, down to START_BLOCK: on a public chain (OP Sepolia) the RPC refuses
+        one query over the whole chain, and the event is usually recent.
+        """
+        start = int(getattr(self.settings, "start_block", 0))
+        chunk = max(1, int(getattr(self.settings, "log_chunk", 10000)))
+        hi = self.web3.eth.block_number if before_block is None else int(before_block)
+        while hi >= start:
+            lo = max(start, hi - chunk + 1)
+            logs = _get_logs(event, lo, hi, {"taskId": task_id})
+            if logs:
+                last = max(logs, key=lambda lg: (lg["blockNumber"], lg["logIndex"]))
+                return int(self.web3.eth.get_block(last["blockNumber"])["timestamp"]), last["blockNumber"]
+            hi = lo - 1
+        return None, None
 
     def task_window(self, task_id: int):
         """(assigned_ts, submitted_ts) in Unix seconds, from block times; None if unknown."""
