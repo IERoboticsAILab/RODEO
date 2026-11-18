@@ -5,8 +5,10 @@ Checks every RODEO proof must pass before its service's validator runs.
                  executor, category and task type
     parameters   the manifest's parameters are the task's (with the service's
                  defaults filled in): the robot did what was asked
-    time         every message lies between the task's assignment and the proof
-                 submission (block times), within a clock tolerance
+    time         the proof spans no longer than assignment -> submission (block
+                 times), within a tolerance. No clock sync is needed. With
+                 CLOCK_CHECK=absolute, every message must also lie inside that window
+                 by the recording computer's clock.
     hash         the file still has the hash in the URI, and no earlier task
                  used it
 """
@@ -50,7 +52,8 @@ class UsedProofs:
             os.replace(tmp, self.path)
 
 
-def check_rodeo_proof(task, proof, window, service_desc, sha_ok, reused_by, tolerance_s) -> Verdict:
+def check_rodeo_proof(task, proof, window, service_desc, sha_ok, reused_by, tolerance_s,
+                      clock_check="duration") -> Verdict:
     """Shared checks. ``window`` is (assigned_ts, submitted_ts)."""
     v = Verdict(ok=True)
     v.check(sha_ok, "proof hash matches the URI", "proof changed after submission (hash mismatch)")
@@ -80,12 +83,23 @@ def check_rodeo_proof(task, proof, window, service_desc, sha_ok, reused_by, tole
     assigned, submitted = window
     if assigned is None or submitted is None:
         v.check(False, "task assignment/submission times not found on chain", "no task time window")
-    elif proof.log_times:
+    elif proof.log_times and clock_check == "absolute":
         lo, hi = min(proof.log_times), max(proof.log_times)
         inside = lo >= assigned - tolerance_s and hi <= submitted + tolerance_s
         v.check(inside, f"recorded {lo - assigned:+.1f} s .. {hi - submitted:+.1f} s relative to "
                         f"assignment/submission (tolerance {tolerance_s:.0f} s)",
                 "proof recorded outside the task's time window")
+    elif proof.log_times:
+        # Clock-independent: the recording computer's clock may be off by any amount,
+        # but the proof cannot take longer than assignment -> submission (block times).
+        # The manifest (task id, executor) and the used-proof hashes stop replays.
+        lo, hi = min(proof.log_times), max(proof.log_times)
+        span, window_s = hi - lo, submitted - assigned
+        v.check(span <= window_s + tolerance_s,
+                f"proof spans {span:.1f} s, task window {window_s:.1f} s (tolerance {tolerance_s:.0f} s)",
+                "proof spans longer than the task was assigned")
+        v.lines.append(f"  INFO  recording clock vs chain: starts {lo - assigned:+.1f} s after assignment "
+                       "(not checked: no clock sync needed)")
     else:
         v.check(False, "proof has no messages", "empty proof")
     return v

@@ -5,6 +5,7 @@ against (when a task was assigned and submitted, and which service it went to).
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,6 +47,7 @@ class ChainClient:
         self.oracle_addr = web3.to_checksum_address(settings.oracle_addr)
         self.oracle_key = settings.oracle_key
         self.contract = self.tm                   # used by the event watcher
+        self._tx_lock = threading.Lock()
 
     def _contract(self, address, name):
         path: Path = self.settings.abi_path(name)
@@ -55,6 +57,10 @@ class ChainClient:
 
     # ------------------------------------------------------------------ transactions
     def send_tx(self, fn):
+        with self._tx_lock:              # verdicts and the expiry sweeper share the nonce
+            return self._send_tx(fn)
+
+    def _send_tx(self, fn):
         s = self.settings
         nonce = self.web3.eth.get_transaction_count(self.oracle_addr)
         gas_price = s.gas_price_override or max(self.web3.eth.gas_price, s.min_gas_price)
@@ -77,6 +83,22 @@ class ChainClient:
         reason = (reason or "")[:128]
         self.send_tx(self.tm.functions.oracleFulfill(task_id, False, reason))
         print(f"Rejected task {task_id} with reason, {reason}")
+
+    def expire_overdue(self) -> list:
+        """Send TaskManager.expireTask for every assigned task past its execution time
+        limit without a proof (the contract unassigns, refunds and frees the service).
+        Returns the ids expired. Raises AttributeError on contracts without timeouts."""
+        expired = []
+        for t in self.tm.functions.getAllTasks().call():
+            task = Task.from_tuple(t)
+            if task.status != 1 or not task.active:
+                continue
+            if not self.tm.functions.isExpired(task.id).call():
+                continue
+            deadline = int(self.tm.functions.deadlineOf(task.id).call())
+            self.send_tx(self.tm.functions.expireTask(task.id))
+            expired.append((task.id, deadline))
+        return expired
 
     # ------------------------------------------------------------------ reads
     def ensure_is_current_oracle(self):

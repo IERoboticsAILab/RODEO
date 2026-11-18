@@ -24,6 +24,12 @@ class Settings:
 
         # Validation
         self.clock_tolerance_s = float(os.environ.get("CLOCK_TOLERANCE_SEC", "5"))
+        # "duration" (default): the proof must not span longer than assignment ->
+        # submission, whatever the recording computer's clock says, so robots and
+        # servers need no clock sync. "absolute": its times must lie inside that window.
+        self.clock_check = os.environ.get("CLOCK_CHECK", "duration")
+        # task execution time limits: how often to send expireTask (0 = off)
+        self.expire_every_s = float(os.environ.get("EXPIRE_EVERY_SEC", "15"))
         self.state_dir = os.environ.get("STATE_DIR", str(Path(__file__).parent.parent / "state"))
         # ORACLE_WATCH=0: console only, no chain watcher (e.g. next to the ROS 2 oracle)
         self.watch = os.environ.get("ORACLE_WATCH", "1") not in ("0", "false", "no")

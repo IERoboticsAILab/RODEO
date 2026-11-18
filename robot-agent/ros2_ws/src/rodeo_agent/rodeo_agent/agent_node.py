@@ -106,6 +106,11 @@ class RodeoAgent(Node):
         self.create_subscription(TaskAssignment, "dao/task_assigned", self._on_assigned, 50, callback_group=cb)
         self.create_subscription(TaskId, "dao/task_verified", self._on_verified, 50, callback_group=cb)
         self.create_subscription(TaskRejection, "dao/task_rejected", self._on_rejected, 50, callback_group=cb)
+        # unassigned on chain while running (time limit passed -> expireTask, or a person
+        # pressed Unassign): stop the robot's run
+        self.create_subscription(TaskId, "dao/task_unassigned", self._on_unassigned, 50, callback_group=cb)
+        self.running = None                # (task id, goal handle) of the executing task
+        self.unassigned_while_running = set()
 
         self.service_ids: dict = {}        # (category, task_type) -> on-chain service id
         self.work: "queue.Queue" = queue.Queue()
@@ -140,7 +145,7 @@ class RodeoAgent(Node):
             raise Timeout(f"{cli.srv_name} did not answer in {timeout:.0f} s")
         return box["r"]
 
-    def _action(self, name: str, goal, timeout: float, feedback=None):
+    def _action(self, name: str, goal, timeout: float, feedback=None, on_handle=None):
         cli = self._a[name]
         if not cli.wait_for_server(timeout_sec=min(timeout, 15.0)):
             raise Timeout(f"action {name} ({cli._action_name}) not available")
@@ -156,10 +161,15 @@ class RodeoAgent(Node):
                 box["result"] = None
                 done.set()
             else:
+                box["gh"] = gh
+                if on_handle is not None:
+                    on_handle(gh)
                 gh.get_result_async().add_done_callback(on_result)
 
         cli.send_goal_async(goal, feedback_callback=feedback).add_done_callback(on_goal)
         if not done.wait(timeout):
+            if "gh" in box:                  # do not leave the robot running
+                box["gh"].cancel_goal_async()
             raise Timeout(f"action {name} did not finish in {timeout:.0f} s")
         return box["result"]
 
@@ -241,6 +251,18 @@ class RodeoAgent(Node):
             return                                   # the bridge filters too; belt and braces
         self.log.info(f"task {msg.task_id} assigned (reward {int(msg.reward_wei) / 1e18:g} IEC)")
         self._enqueue(int(msg.task_id))
+
+    def _on_unassigned(self, msg: TaskId) -> None:
+        tid = int(msg.task_id)
+        with self.lock:
+            running = self.running
+        if running is None or running[0] != tid:
+            return
+        self.log.warning(f"task {tid}: unassigned on chain while running (time limit passed, "
+                         "or unassigned by a person) - cancelling the run")
+        with self.lock:
+            self.unassigned_while_running.add(tid)
+        running[1].cancel_goal_async()
 
     def _on_verified(self, msg: TaskId) -> None:
         self._verdict(int(msg.task_id), True, "")
@@ -343,11 +365,25 @@ class RodeoAgent(Node):
             f = fb.feedback
             self.log.info(f"task {task_id}: {f.stage}" + (f" - {f.detail}" if f.detail else ""))
 
+        def on_handle(gh):
+            with self.lock:
+                self.running = (task_id, gh)
+
         try:
-            result = self._action("execute", goal, self.exec_timeout, feedback)
+            result = self._action("execute", goal, self.exec_timeout, feedback, on_handle)
         except Timeout as e:
             result = None
             self.log.error(f"task {task_id}: {e}")
+        finally:
+            with self.lock:
+                self.running = None
+                unassigned = task_id in self.unassigned_while_running
+                self.unassigned_while_running.discard(task_id)
+        if unassigned:
+            self.log.warning(f"task {task_id}: run stopped; the contract already unassigned it, "
+                             "refunded the creator and freed the service")
+            self._resume(siblings, f"task {task_id} unassigned")
+            return
         if result is None or not result.success:
             msg = result.message if result is not None else "no result"
             self.log.error(f"task {task_id}: execution failed ({msg}) - left for a person to resolve")

@@ -46,7 +46,19 @@ service's validator runs:
 | Reuse | a proof already used for another task (hashes are kept in `state/used_proofs.json`) |
 | Manifest | a proof for another task, executor, category or task type |
 | Parameters | a proof whose parameters differ from the task's (with the service's defaults filled in) |
-| Time window | messages recorded before the task's assignment or after the proof's submission (block times, `CLOCK_TOLERANCE_SEC`) |
+| Time window | a proof that spans longer than the task was assigned (assignment to submission, block times, `CLOCK_TOLERANCE_SEC`). Only durations are compared, so the robot's and servers' clocks need no sync. `CLOCK_CHECK=absolute` restores the old check (every message inside the window by the recording computer's clock) |
+
+### Execution time limits
+
+`Organization.setTaskTimeout(category, seconds)` gives a category a time limit
+from assignment. `deploy.js` sets Logistics to 900 s (`LOGISTICS_TIMEOUT_S`). The
+contract refuses a proof submitted after the deadline. A contract cannot act by
+itself, so every `EXPIRE_EVERY_SEC` (default 15; 0 = off) the oracle sends
+`TaskManager.expireTask` for assigned tasks past their deadline without a proof.
+The contract then unassigns the task, refunds the creator, frees the service and
+deactivates the task (Activate posts it again). The robot's agent sees
+`TaskUnassigned` and cancels the run. A proof submitted in time is still verified
+after the deadline. Only block times are compared.
 
 ### Validators
 

@@ -82,7 +82,8 @@ class OracleController:
             proof = read_rodeo_proof(path)
             service_desc = self.tm.service_description_for_task(t.id)
             verdict = check_rodeo_proof(t, proof, self.tm.task_window(t.id), service_desc,
-                                        sha_ok, reused, self.settings.clock_tolerance_s)
+                                        sha_ok, reused, self.settings.clock_tolerance_s,
+                                        clock_check=self.settings.clock_check)
             if verdict.ok:
                 fn = validator_for(t.category, t.task_type)
                 if fn is None:

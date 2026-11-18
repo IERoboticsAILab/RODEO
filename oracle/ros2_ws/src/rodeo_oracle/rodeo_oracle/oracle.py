@@ -37,6 +37,7 @@ from web3 import Web3
 from oracle_node.chain import ChainClient
 from oracle_node.checks import UsedProofs, check_rodeo_proof
 from oracle_node.events import EventWatcher
+from oracle_node.expiry import run_expiry_sweeper
 from oracle_node.proofs import KIND_CSV, KIND_RODEO, KIND_ROS1_BAG, detect_kind
 from oracle_node.settings import Settings
 from oracle_node.validators import Verdict
@@ -88,6 +89,8 @@ class RodeoOracle(Node):
             "on_verified": lambda tid: self.log.info(f"task {tid} verified"),
             "on_rejected": lambda tid, r: self.log.info(f"task {tid} rejected: {r}"),
         }).start()
+        threading.Thread(target=run_expiry_sweeper, daemon=True,
+                         args=(self.chain, self.settings.expire_every_s, self.log.info)).start()
 
     # ------------------------------------------------------------------ one request
     def handle_request(self, tid: int):
@@ -129,7 +132,8 @@ class RodeoOracle(Node):
             proof = read_proof(path)
             service_desc = self.chain.service_description_for_task(t.id)
             verdict = check_rodeo_proof(t, proof, self.chain.task_window(t.id), service_desc,
-                                        sha_ok, reused, self.settings.clock_tolerance_s)
+                                        sha_ok, reused, self.settings.clock_tolerance_s,
+                                        clock_check=self.settings.clock_check)
             if verdict.ok:
                 self._call_validator(t, proof, service_desc, path, verdict)
             self.used.record(sha, t.id)

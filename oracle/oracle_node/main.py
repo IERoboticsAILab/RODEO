@@ -5,6 +5,7 @@ from web3 import Web3
 from .chain import ChainClient
 from .controller import OracleController
 from .events import EventWatcher
+from .expiry import run_expiry_sweeper
 from .settings import Settings
 
 
@@ -22,6 +23,8 @@ def main():
         daemon=True)
     if settings.watch:
         thread.start()
+        threading.Thread(target=run_expiry_sweeper, daemon=True,
+                         args=(chain, settings.expire_every_s)).start()
     else:
         print("Console only (ORACLE_WATCH=0): not watching the chain")
     try:

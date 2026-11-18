@@ -57,8 +57,9 @@ def proof(params=PARAMS, task_id=7, drop_xy=DROP, unload=True, load_kg=1.2):
     return p
 
 
-def run(t, p, window=(T0, T0 + 20)):
-    v = check_rodeo_proof(t, p, window, DESC, sha_ok=True, reused_by=None, tolerance_s=5)
+def run(t, p, window=(T0, T0 + 20), clock_check="duration"):
+    v = check_rodeo_proof(t, p, window, DESC, sha_ok=True, reused_by=None, tolerance_s=5,
+                          clock_check=clock_check)
     if v.ok:
         sub = validator_for(t.category, t.task_type)(NS(task=t, proof=p, service_desc=DESC, settings=None))
         v.lines += sub.lines
@@ -85,10 +86,15 @@ def test_bad_deliveries_rejected(t_kw, p_kw, reason):
 
 
 def test_time_window_and_hash_and_reuse():
-    t, p = task(), proof()
-    assert run(t, p, window=(T0 + 10, T0 + 20)).reason == "proof recorded outside the task's time window"   # starts 9 s early
-    assert run(t, p, window=(T0, T0 + 5)).reason == "proof recorded outside the task's time window"         # ends 7 s late
-    assert run(t, p, window=(T0 + 4, T0 + 8)).ok                                                               # within 5 s
+    t, p = task(), proof()                                 # proof recorded T0+1 .. T0+12 (11 s)
+    absolute = dict(clock_check="absolute")
+    assert run(t, p, (T0 + 10, T0 + 20), **absolute).reason == "proof recorded outside the task's time window"   # starts 9 s early
+    assert run(t, p, (T0, T0 + 5), **absolute).reason == "proof recorded outside the task's time window"         # ends 7 s late
+    assert run(t, p, (T0 + 4, T0 + 8), **absolute).ok                                                               # within 5 s
+    # default (duration): the recording clock may be off by any amount
+    assert run(t, p, window=(T0 + 3600, T0 + 3620)).ok                                     # clock 1 h behind
+    assert run(t, p, window=(T0 - 7200, T0 - 7190)).ok                                     # 2 h ahead, 10 s window
+    assert run(t, p, window=(T0, T0 + 1)).reason == "proof spans longer than the task was assigned"  # > 1 + 5 s
     v = check_rodeo_proof(t, p, (T0, T0 + 20), DESC, sha_ok=False, reused_by=None, tolerance_s=5)
     assert v.reason == "proof changed after submission (hash mismatch)"
     v = check_rodeo_proof(t, p, (T0, T0 + 20), DESC, sha_ok=True, reused_by=3, tolerance_s=5)
