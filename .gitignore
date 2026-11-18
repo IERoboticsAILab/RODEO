@@ -28,3 +28,8 @@ oracle/state/
 
 # org-web admin PIN (see dao-bridge/org-web/.env.admin.example)
 dao-bridge/org-web/.env.admin
+
+# Settings for IE Coin on OP Sepolia hold real keys (copies of the .example files)
+oracle/docker/.env.opsepolia
+dao-bridge/org-web/.env.opsepolia
+dao-bridge/org-web/state/

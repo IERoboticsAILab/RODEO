@@ -110,6 +110,55 @@ Robots never hold contract addresses themselves: they call the bridge's actions
 and services, and the bridge reads `dao.yaml`. The demo in
 `quick-start/` needs no update.
 
+## IE Coin on OP Sepolia
+
+The lab's IE Coin runs on **OP Sepolia** (chain id `11155420`, RPC
+`https://sepolia.optimism.io`, explorer https://sepolia-optimism.etherscan.io,
+lab explorer https://iecoin.cyphy.life); see IERoboticsAILab/iecoin#1. Its
+Organization, ServiceManager and TaskManager are the code from before the
+on-chain time limits, so org-web keeps the limits (`task_timer.py`). The local
+Ganache settings stay the default; OP Sepolia is chosen per component:
+
+| Component | OP Sepolia settings | Key |
+|---|---|---|
+| org-web | `dao-bridge/org-web/.env.opsepolia` (from `.env.opsepolia.example`) | operator (Organization owner) `0xdB3E…0146` |
+| oracle | `oracle/docker/.env.opsepolia` (from `.env.opsepolia.example`) | oracle `0xE384…Ac4e` |
+| bridge | `dao-bridge/ros2-eth-bridge/docker/configs/dao.opsepolia.yaml` | robot `0xf31e…917f`, keystore `~/.ros_eth/wallet_opsepolia.json` |
+
+The keys are in Bitwarden (CyPhy Life → Lab Infra, "RODEO Sepolia wallets +
+contracts"). The `.env.opsepolia` files are gitignored; never put these keys in a
+tracked file.
+
+Once:
+
+```bash
+cd ~/rodeo-ros2
+# robot keystore (Enter = empty passphrase); the key is read without echo
+read -rs -p "robot private key: " ROBOT_PRIVATE_KEY; echo; export ROBOT_PRIVATE_KEY
+python3 dao-bridge/ros2-eth-bridge/scripts/make_wallet.py --out ~/.ros_eth/wallet_opsepolia.json
+unset ROBOT_PRIVATE_KEY
+cp dao-bridge/org-web/.env.opsepolia.example dao-bridge/org-web/.env.opsepolia   # add the operator key
+cp oracle/docker/.env.opsepolia.example oracle/docker/.env.opsepolia             # add the oracle key
+```
+
+Start (Ganache not needed):
+
+```bash
+cd ~/rodeo-ros2/oracle/docker && docker compose --env-file .env.opsepolia up -d --force-recreate
+cd ~/rodeo-ros2/dao-bridge/org-web && docker compose --env-file .env.opsepolia up -d --force-recreate
+cd ~/rodeo-ros2/dao-bridge/ros2-eth-bridge/docker
+DAO_CONFIG=dao.opsepolia.yaml WALLET_PATH=~/.ros_eth/wallet_opsepolia.json \
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --force-recreate
+cd ~/rodeo-ros2/quick-start/docker
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --no-deps --force-recreate agent
+```
+
+Check: the bridge logs `chain 11155420`; the agent registers its service (first
+time on the new contracts); org-web's catalog lists it with the 15 min limit and
+the org-web log says `task timer: limits {'Logistics': 900}`. Deposit IEC into the
+Organization (org-web, organization box) before posting tasks from it. Back to
+Ganache: the same commands without `--env-file`, `DAO_CONFIG` and `WALLET_PATH`.
+
 ## Quick Update Script
 
 `scripts/update-addresses.sh` updates the oracle, org-web and bridge configs in

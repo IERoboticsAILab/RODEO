@@ -1,0 +1,26 @@
+# IE Coin on OP Sepolia (IERoboticsAILab/iecoin#1). Select it with
+#   DAO_CONFIG=dao.opsepolia.yaml WALLET_PATH=~/.ros_eth/wallet_opsepolia.json docker compose up -d --force-recreate
+# The public RPC has no websocket: both URLs are HTTP. No secrets here: the robot's
+# key is in the keystore (scripts/make_wallet.py).
+chain:
+  rpc_url: https://sepolia.optimism.io
+  http_fallback_url: https://sepolia.optimism.io
+  chain_id: 11155420
+contracts:
+  iecoin: "0x0235a0145303B013561FD1E9658F8eD8BA5629Bd"
+  organization: "0xA0121b301f86e54d0E9Df8A5BDFF506C5815d426"
+  task_manager: "0xddB7727600b2C3DD22737Bce371C6EdBC3184978"
+  service_manager: "0x0C3CCc95c02b4768706F0a2Bb53333E7d64587CA"
+abi_paths:
+  iecoin: "abi/IECoin.json"
+  organization: "abi/Organization.json"
+  task_manager: "abi/TaskManager.json"
+  service_manager: "abi/ServiceManager.json"
+wallet:
+  keystore_path: ~/.ros_eth/wallet.json
+  address: "f31e405a68caa3f021027395d7a7d2f6987d917f"
+transaction:
+  confirmations: 1
+  max_retries: 5
+  gas_limit: 3000000
+  gas_multiplier: 1.3

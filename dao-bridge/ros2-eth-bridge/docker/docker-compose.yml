@@ -21,7 +21,8 @@ services:
       - ETH_WALLET_KEYSTORE=${ETH_WALLET_KEYSTORE:-}
       - ROS_ETH_DAO_YAML=/config/dao.yaml
     volumes:
-      - ./configs/dao.yaml:/config/dao.yaml:ro
+      # DAO_CONFIG=dao.opsepolia.yaml: IE Coin on OP Sepolia (with its own WALLET_PATH)
+      - ./configs/${DAO_CONFIG:-dao.yaml}:/config/dao.yaml:ro
       # keystore must exist on the host before the first start
       - ${WALLET_PATH:-~/.ros_eth/wallet.json}:/root/.ros_eth/wallet.json:ro
     restart: unless-stopped
