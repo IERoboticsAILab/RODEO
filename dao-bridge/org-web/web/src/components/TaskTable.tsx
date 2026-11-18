@@ -1,5 +1,5 @@
 import { Task } from "../lib/types";
-import { formatUnitsString } from "../lib/units";
+import { formatDuration, formatUnitsString } from "../lib/units";
 import { describeTask } from "../lib/describe";
 
 // 0x8464135c8F25Da09e49BC8782676a84730C318bC -> 0x8464…18bC (full address on hover)
@@ -37,6 +37,30 @@ const badgeStyle = (bg: string): React.CSSProperties => ({
   color: "#111827",           // readable dark text
 });
 
+// Only tasks whose category has a time limit (e.g. Logistics) show anything here.
+// Unassigned: the limit that starts when a robot takes it. Assigned: time left until
+// the contract's deadline, or "proof in time". Executed: the limit it had.
+function TimeLimit({ row }: { row: TaskRow }) {
+  if (!row.timeoutS) return null;
+  const limit = formatDuration(row.timeoutS);
+  if (row.status !== 1 || row.deadline == null) {
+    return <span title="execution time limit, counted from the assignment">{limit}</span>;
+  }
+  const at = new Date(row.deadline * 1000).toLocaleTimeString();
+  if (row.proofInTime) {
+    return <span className="badge" style={badgeStyle(YES_BG)} title={`limit ${limit}, deadline ${at}`}>proof in time</span>;
+  }
+  const left = row.secondsLeft ?? 0;
+  if (left < 0) {
+    return <span className="badge" style={badgeStyle(NO_BG)} title={`deadline ${at}: the oracle unassigns it shortly`}>timed out</span>;
+  }
+  return (
+    <span className="badge" style={badgeStyle(left < 120 ? "#fdd0a2" : "#e5e7eb")} title={`limit ${limit}, deadline ${at}`}>
+      {formatDuration(left)} left
+    </span>
+  );
+}
+
 // an assigned task (e.g. one the robot failed) is unassigned first: that frees the
 // robot's service, refunds the creator and deactivates the task
 export type TaskAction = "remove" | "activate" | "unassign";
@@ -58,6 +82,7 @@ export default function TaskTable({
             <th className="th">Creator</th>
             <th className="th">Executor</th>
             <th className="th">Status</th>
+            <th className="th">Time limit</th>
             <th className="th">Active</th>
             <th className="th">Verified</th>
             <th className="th">Actions</th>
@@ -87,6 +112,7 @@ export default function TaskTable({
                 <td className="td font-mono text-xs whitespace-nowrap" title={row.creator}>{shortAddr(row.creator)}</td>
                 <td className="td font-mono text-xs whitespace-nowrap" title={row.executor}>{shortAddr(row.executor)}</td>
                 <td className="td"><span className="badge" style={badgeStyle(STATUS_BG[row.status] ?? "#e5e7eb")}>{statusLabel(row.status)}</span></td>
+                <td className="td whitespace-nowrap"><TimeLimit row={row} /></td>
                 <td className="td">
                   <span className="badge" style={badgeStyle(row.active ? YES_BG : NO_BG)}>{row.active ? "Yes" : "No"}</span>
                 </td>

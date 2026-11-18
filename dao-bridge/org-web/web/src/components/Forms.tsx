@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogEntry, ParamSpec } from "../lib/types";
+import { formatDuration } from "../lib/units";
 
 export type TaskRequest = {
   title: string;                                // the task's name
@@ -21,6 +22,13 @@ function availability(e: CatalogEntry): string {
   const who = e.robot ? ` · offered by ${e.robot}` : "";
   if (e.free > 0) return `${e.free} of ${e.providers} free · from ${e.minPriceIec} IEC${who}`;
   return `all ${e.providers} busy, the task will queue · from ${e.minPriceIec} IEC${who}`;
+}
+
+// only categories with a limit (e.g. Logistics) get this line
+function timeLimit(e: CatalogEntry): string {
+  return e.timeoutS
+    ? ` · must be done within ${formatDuration(e.timeoutS)} of a robot taking it, or it is unassigned and refunded`
+    : "";
 }
 
 function defaultsFor(e: CatalogEntry | undefined): Record<string, string> {
@@ -169,7 +177,7 @@ export function CreateTaskForm({ catalog, onCreate }: TaskFormProps) {
       {entry ? (
         <>
           <p className="text-xs opacity-70 -mt-2">
-            {entry.name}{entry.summary ? `: ${entry.summary}` : ""} · {availability(entry)}
+            {entry.name}{entry.summary ? `: ${entry.summary}` : ""} · {availability(entry)}{timeLimit(entry)}
           </p>
 
           {paramNames.length > 0 ? (

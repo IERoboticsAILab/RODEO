@@ -2,6 +2,7 @@ from web3 import Web3
 import json
 import os
 import sys
+import time
 from typing import Any, Dict, List, Tuple, Optional
 from decimal import Decimal, getcontext
 from hexbytes import HexBytes
@@ -267,7 +268,7 @@ def set_service_busy(index: int, is_busy: bool) -> str:
 def list_all_tasks() -> list:
     tm = get_task_manager()
     rows = tm.functions.getAllTasks().call()
-    return [_normalize_task(t) for t in rows]
+    return _with_timeouts([_normalize_task(t) for t in rows])
 
 def get_tasks_by_creator(creator: str) -> list:
     tm = get_task_manager()
@@ -276,7 +277,7 @@ def get_tasks_by_creator(creator: str) -> list:
     for tid in ids:
         t = tm.functions.getTask(tid).call()
         tasks.append(_normalize_task(t))
-    return tasks
+    return _with_timeouts(tasks)
 
 def list_all_services() -> list:
     sm = get_service_manager()
@@ -291,6 +292,70 @@ def get_services_by_creator(creator: str) -> list:
         s = sm.functions.getService(sid).call()
         out.append(_normalize_service(s))
     return out
+
+# ---------- Execution time limits (TaskManager.categoryTimeout etc.) ----------
+# A category may have a limit (Logistics: 900 s), counted from the assignment and
+# enforced by the contract. Rows of categories without one get no timeout fields,
+# so the page shows nothing for them. A TaskManager deployed before the limits
+# existed has no such functions: then no row gets them.
+_HAS_TIMEOUTS: Optional[bool] = None
+
+
+def _timeouts_supported(tm) -> bool:
+    global _HAS_TIMEOUTS
+    if _HAS_TIMEOUTS is None:
+        try:
+            tm.functions.categoryTimeout(b"\0" * 32).call()
+            _HAS_TIMEOUTS = True
+        except Exception:
+            _HAS_TIMEOUTS = False
+    return _HAS_TIMEOUTS
+
+
+def category_timeouts(categories) -> Dict[str, int]:
+    """{category: seconds} for the categories that have a time limit."""
+    tm = get_task_manager()
+    if not _timeouts_supported(tm):
+        return {}
+    out = {}
+    for c in set(categories):
+        sec = int(tm.functions.categoryTimeout(Web3.keccak(text=c)).call())
+        if sec:
+            out[c] = sec
+    return out
+
+
+def _with_timeouts(tasks: list) -> list:
+    """
+    Adds to each row with a time limit:
+      timeoutS     the limit: fixed at the assignment for assigned/executed tasks,
+                   the category's current one for unassigned tasks
+      deadline     assigned tasks: block time (unix s) by which the proof must be in
+      secondsLeft  assigned tasks: deadline - now (negative: overdue, the oracle
+                   expires it within EXPIRE_EVERY_SEC)
+      proofInTime  assigned tasks: the proof was submitted before the deadline
+    """
+    tm = get_task_manager()
+    if not tasks or not _timeouts_supported(tm):
+        return tasks
+    by_cat = category_timeouts(t["taskCategory"] for t in tasks if t["status"] == 0)
+    now = int(time.time())
+    for t in tasks:
+        if t["status"] == 0:
+            if t["taskCategory"] in by_cat:
+                t["timeoutS"] = by_cat[t["taskCategory"]]
+            continue
+        limit = int(tm.functions.taskTimeout(t["id"]).call())
+        if not limit:
+            continue
+        t["timeoutS"] = limit
+        if t["status"] == 1:
+            deadline = int(tm.functions.assignedAt(t["id"]).call()) + limit
+            t["deadline"] = deadline
+            t["secondsLeft"] = deadline - now
+            t["proofInTime"] = int(tm.functions.proofAt(t["id"]).call()) != 0
+    return tasks
+
 
 def _normalize_task(t) -> Dict[str, Any]:
     # matches TaskManager.Task tuple

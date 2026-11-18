@@ -10,7 +10,8 @@ from org_code import (
     manager_addresses, ORG_CONTRACT_ADDR, Web3,
     list_iecoin_holders, IECOIN_ADDR,
     TOKEN_SYMBOL, TOKEN_DECIMALS,
-    deposit_to_organization, iecoin, organization, task_funds_wei, ORG_WALLET_ADDR
+    deposit_to_organization, iecoin, organization, task_funds_wei, ORG_WALLET_ADDR,
+    category_timeouts,
 )
 
 from catalog import build_catalog, find, task_description
@@ -104,8 +105,14 @@ def tasks_assigned_to_org() -> List[Dict[str, Any]]:
 
 @app.get("/catalog")
 def catalog() -> List[Dict[str, Any]]:
-    """What can be ordered now: one entry per kind of active service (see catalog.py)."""
-    return build_catalog(list_all_services())
+    """What can be ordered now: one entry per kind of active service (see catalog.py).
+    An entry whose category has an execution time limit gets ``timeoutS``."""
+    entries = build_catalog(list_all_services())
+    limits = category_timeouts(e["category"] for e in entries)
+    for e in entries:
+        if e["category"] in limits:
+            e["timeoutS"] = limits[e["category"]]
+    return entries
 
 
 def _checked_description(body: "TaskCreate") -> str:
