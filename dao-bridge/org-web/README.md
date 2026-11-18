@@ -188,6 +188,36 @@ opens a **details** section with only the fields that service declares, such as
 a delivery's pick-up and drop-off places. Fixed services, like a lab tour, have
 no details.
 
+## Execution time limits
+
+A category can have a time limit, counted from each task's own assignment
+(Logistics: 15 min). The task table shows it in the **Time limit** column (time
+left while assigned), and the task form says it. Categories without one show
+nothing.
+
+- **Contracts with on-chain limits** (RODEO `rodeo-v2`, local Ganache): the
+  contract keeps them (`TaskManager.categoryTimeout`) and the oracle expires
+  overdue tasks. org-web only shows them.
+- **Contracts without them** (the IE Coin contracts on OP Sepolia):
+  `backend/task_timer.py` keeps them. It reads each task's last `TaskAssigned`
+  block time; once the chain's latest block time is past it plus the limit and no
+  proof was submitted, it calls `Organization.unassignTask` with the
+  organization's key: the creator is refunded, the robot's service freed, the
+  task deactivated, and the robot's agent stops the run. Every task has its own
+  clock; a new assignment starts a new one. Only chain time is used.
+  Settings: `ORG_TASK_TIMEOUTS` (`Logistics=900`; empty = off),
+  `ORG_TIMER_EVERY_S` (10), `ORG_START_BLOCK` (first block to read events from),
+  `ORG_LOG_CHUNK` (2000). Assignment times are kept in `./state/` across restarts.
+  The contract can't refuse a late proof: one submitted after the deadline but
+  before the next check (≤ 10 s) is still accepted.
+
+## IE Coin on OP Sepolia
+
+`.env.opsepolia.example` has the addresses and settings. Copy it to
+`.env.opsepolia` (gitignored), put in the operator's key (Bitwarden), then
+`docker compose --env-file .env.opsepolia up -d --force-recreate`. The default
+`.env` stays the local Ganache. See `DEPLOYMENT-CONFIG.md` in the repo root.
+
 ## Wallets (MetaMask)
 
 Anyone can post tasks from their own wallet. **Connect MetaMask** (top right)

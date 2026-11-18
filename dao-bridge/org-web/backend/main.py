@@ -11,11 +11,12 @@ from org_code import (
     list_iecoin_holders, IECOIN_ADDR,
     TOKEN_SYMBOL, TOKEN_DECIMALS,
     deposit_to_organization, iecoin, organization, task_funds_wei, ORG_WALLET_ADDR,
-    category_timeouts,
+    category_timeouts, timeouts_on_chain, get_task_manager, web3,
 )
 
 from catalog import build_catalog, find, task_description
 import wallet
+import task_timer
 
 import hmac
 import os
@@ -40,6 +41,24 @@ def require_admin(x_admin_pin: Optional[str] = Header(default=None)) -> None:
 ADMIN = [Depends(require_admin)]
 
 app = FastAPI(title="Organization Console API")
+
+# Time limits kept here when the TaskManager has none on chain (task_timer.py)
+TIMER = None
+
+
+@app.on_event("startup")
+def _start_task_timer() -> None:
+    global TIMER
+    try:
+        TIMER = task_timer.start_from_env(
+            web3, get_task_manager, list_all_tasks, unassign_task, timeouts_on_chain(),
+            log=lambda m: print(m, flush=True))
+    except Exception as e:                   # the console still works without it
+        print(f"task timer: not started: {e}", flush=True)
+
+
+def _timed(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return TIMER.annotate(rows) if TIMER else rows
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,11 +109,11 @@ def contracts() -> Dict[str, str]:
 
 @app.get("/tasks")
 def tasks() -> List[Dict[str, Any]]:
-    return list_all_tasks()
+    return _timed(list_all_tasks())
 
 @app.get("/tasks/by-creator")
 def tasks_by_creator(creator: str = ORG_CONTRACT_ADDR) -> List[Dict[str, Any]]:
-    return get_tasks_by_creator(creator)
+    return _timed(get_tasks_by_creator(creator))
 
 @app.get("/tasks/assigned-to-org")
 def tasks_assigned_to_org() -> List[Dict[str, Any]]:
@@ -108,7 +127,7 @@ def catalog() -> List[Dict[str, Any]]:
     """What can be ordered now: one entry per kind of active service (see catalog.py).
     An entry whose category has an execution time limit gets ``timeoutS``."""
     entries = build_catalog(list_all_services())
-    limits = category_timeouts(e["category"] for e in entries)
+    limits = TIMER.limits if TIMER else category_timeouts(e["category"] for e in entries)
     for e in entries:
         if e["category"] in limits:
             e["timeoutS"] = limits[e["category"]]

@@ -312,6 +312,11 @@ def _timeouts_supported(tm) -> bool:
     return _HAS_TIMEOUTS
 
 
+def timeouts_on_chain() -> bool:
+    """True when the TaskManager enforces execution time limits itself."""
+    return _timeouts_supported(get_task_manager())
+
+
 def category_timeouts(categories) -> Dict[str, int]:
     """{category: seconds} for the categories that have a time limit."""
     tm = get_task_manager()

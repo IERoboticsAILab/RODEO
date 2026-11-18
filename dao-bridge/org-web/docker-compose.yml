@@ -47,9 +47,19 @@ services:
       
       # Optional: IECoin deployment block (for optimization)
       - IECOIN_DEPLOY_BLOCK=${IECOIN_DEPLOY_BLOCK:-0}
+
+      # Execution time limits kept by org-web when the TaskManager has none on
+      # chain (task_timer.py): category=seconds, from each task's assignment.
+      - ORG_TASK_TIMEOUTS=${ORG_TASK_TIMEOUTS:-Logistics=900}
+      - ORG_TIMER_EVERY_S=${ORG_TIMER_EVERY_S:-10}
+      - ORG_START_BLOCK=${ORG_START_BLOCK:-0}       # first block to read TaskAssigned from
+      - ORG_LOG_CHUNK=${ORG_LOG_CHUNK:-2000}
     volumes:
       # Mount contract ABIs (read-only)
       - ./backend/contracts:/app/contracts:ro
+
+      # task_timer.py remembers assignment times here (no rescan after a restart)
+      - ./state:/app/state
       
       # Optional: Mount addresses.json if not using env vars
       # - ./backend/addresses.json:/app/addresses.json:ro
