@@ -44,6 +44,14 @@ contract TaskManager {
     address public oracle;
     uint256 public constant MAX_REASON_LENGTH = 128;
 
+    // Execution time limit per task category (seconds from assignment; 0 = no limit).
+    // Set by the organization, e.g. "Logistics" -> 900 (15 min). Kept outside the
+    // Task struct so getTask/getAllTasks keep their ABI.
+    mapping(bytes32 => uint256) public categoryTimeout;
+    mapping(uint256 => uint256) public assignedAt;    // taskId -> block time of the assignment
+    mapping(uint256 => uint256) public taskTimeout;   // taskId -> limit fixed at assignment
+    mapping(uint256 => uint256) public proofAt;       // taskId -> block time of the proof (0 = none)
+
     event TaskRegistered(uint256 taskId, address indexed creator);
     event TaskRemoved(uint256 taskId);
     event TaskRewardPaid(uint256 taskId, address executor, uint256 reward);
@@ -53,6 +61,8 @@ contract TaskManager {
     event TaskOracleRequested(uint256 indexed taskId, address indexed oracle);
     event TaskVerified(uint256 indexed taskId);
     event TaskRejected(uint256 indexed taskId, string reason); // short reason for indexing
+    event TaskTimeoutSet(string category, uint256 timeoutSeconds);
+    event TaskExpired(uint256 indexed taskId, uint256 deadline);
 
     constructor(address tokenAddress, address organizationAddress) {
         token = IECoin(tokenAddress);
@@ -64,6 +74,36 @@ contract TaskManager {
         require(_oracle != address(0), "Zero oracle");
         // store once at contract level
         oracle = _oracle;
+    }
+
+    function setCategoryTimeout(string calldata category, uint256 timeoutSeconds) external {
+        require(msg.sender == address(organization), "Only org");
+        categoryTimeout[keccak256(bytes(category))] = timeoutSeconds;
+        emit TaskTimeoutSet(category, timeoutSeconds);
+    }
+
+    /// Block time by which the proof must be submitted; 0 = not assigned or no limit.
+    function deadlineOf(uint256 taskId) public view returns (uint256) {
+        require(taskId > 0 && taskId <= tasks.length, "Invalid task ID");
+        Task storage task = tasks[taskId - 1];
+        if (task.status != TaskStatus.Assigned || taskTimeout[taskId] == 0) return 0;
+        return assignedAt[taskId] + taskTimeout[taskId];
+    }
+
+    /// True when anyone may call expireTask(taskId) now.
+    function isExpired(uint256 taskId) public view returns (bool) {
+        uint256 d = deadlineOf(taskId);
+        return d != 0 && block.timestamp > d && proofAt[taskId] == 0 && tasks[taskId - 1].active;
+    }
+
+    /// Past the deadline without a proof: unassign, refund the creator, free the
+    /// service, deactivate the task (the same path as unassignTask). Anyone may call
+    /// it (the oracle does, every few seconds), since a contract cannot act by itself.
+    function expireTask(uint256 taskId) external {
+        require(isExpired(taskId), "Task not expired");
+        uint256 d = deadlineOf(taskId);
+        organization.checkTaskCancelation(taskId);
+        emit TaskExpired(taskId, d);
     }
 
     function getTaskMeta(uint256 taskId) external view returns (uint256 tId, bytes32 categoryHash, bytes32 taskTypeHash, bool active, uint256 reward) {
@@ -107,6 +147,9 @@ contract TaskManager {
         task.reward = reward; // update to the agreed reward, can be same or lower than originally posted
         task.executor = executor;
         task.status = TaskStatus.Assigned;
+        assignedAt[taskId] = block.timestamp;
+        taskTimeout[taskId] = categoryTimeout[task.categoryHash];
+        proofAt[taskId] = 0;
 
         emit TaskAssigned(taskId);
     }
@@ -186,8 +229,11 @@ contract TaskManager {
         require(t.status == TaskStatus.Assigned, "Not in Assigned");
         require(msg.sender == t.executor, "Only assigned executor");
         require(bytes(proofURI).length > 0, "Bad URI");
+        uint256 d = deadlineOf(taskId);
+        require(d == 0 || block.timestamp <= d, "Task timed out");
 
         t.proofURI = proofURI;
+        proofAt[taskId] = block.timestamp;
 
         emit TaskProofSubmitted(taskId, t.executor, proofURI);
         emit TaskOracleRequested(taskId, oracle);

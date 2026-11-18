@@ -130,6 +130,10 @@ Organization task funds on the Home page.
    `TaskManager.unassignTask` has no sender check: anyone can unassign any
    assigned task (org-web's Unassign button uses it for wallet-posted tasks,
    `Organization.unassignTask` for the organization's).
+   Added 2026-11-18 (with tests): execution time limits per category
+   (`Organization.setTaskTimeout`, `TaskManager.expireTask` / `isExpired` /
+   `deadlineOf`, kept outside the Task struct so `getTask` keeps its ABI). The
+   oracle sends `expireTask`, and late proofs revert ("Task timed out").
 5. Later: cleanup group C (old oracle scripts; ask Milan about
    smart-contracts/python and templates), TIAGo and drone executors.
 

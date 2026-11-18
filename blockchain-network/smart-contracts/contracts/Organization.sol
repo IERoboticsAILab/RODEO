@@ -15,6 +15,7 @@ interface ITaskManager {
     function setOracle(address _oracle) external;
     function submitProof(uint256 taskId, string calldata proofURI) external;
     function activateTask(uint256 taskId) external;
+    function setCategoryTimeout(string calldata category, uint256 timeoutSeconds) external;
 }
 
 interface IServiceManager {
@@ -62,6 +63,12 @@ contract Organization is Ownable {
 
     function setOracle(address _oracle) external onlyOwner {
         taskManager.setOracle(_oracle);
+    }
+
+    /// Execution time limit for tasks of `category`, in seconds from assignment
+    /// (0 = none). Applies to tasks assigned after the change.
+    function setTaskTimeout(string calldata category, uint256 timeoutSeconds) external onlyOwner {
+        taskManager.setCategoryTimeout(category, timeoutSeconds);
     }
 
     // wrappers for TaskManager

@@ -58,6 +58,14 @@ async function main() {
   const oracleAddress = oracleSigner.address; // replace if you have a specific oracle address
   await (await organization.connect(organizationOwner).setOracle(oracleAddress)).wait();
 
+  // Execution time limits per category (seconds from assignment). The oracle expires
+  // tasks that pass it without a proof (unassign + refund); late proofs are refused.
+  const TASK_TIMEOUTS = { Logistics: Number(process.env.LOGISTICS_TIMEOUT_S || 900) };
+  for (const [category, seconds] of Object.entries(TASK_TIMEOUTS)) {
+    await (await organization.connect(organizationOwner).setTaskTimeout(category, seconds)).wait();
+    console.log(`⏱  ${category} tasks time out ${seconds} s after assignment`);
+  }
+
   // === Log deployed addresses ===
   console.log("✅ Contracts deployed successfully:\n");
   console.log(`IECoin:          ${iecoin.target}`);
