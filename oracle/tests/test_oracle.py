@@ -162,3 +162,39 @@ def test_charging_good_and_bad():
     assert run_charge(charge_proof(seconds=4)).reason.startswith("too little energy delivered")
     p = charge_proof(); p.events = p.events[:1]
     assert run_charge(p).reason == "no complete charging session in the proof"
+
+
+# ------------------------------------------------------------------ expiry sweeper
+from web3.exceptions import ContractLogicError  # noqa: E402
+
+from oracle_node.chain import ChainClient  # noqa: E402
+from oracle_node.expiry import run_expiry_sweeper  # noqa: E402
+
+
+def _sweeper_chain(is_expired):
+    """A ChainClient without web3: one assigned, active task; isExpired as given."""
+    call = lambda v: NS(call=lambda *a, **k: v() if callable(v) else v)  # noqa: E731
+    task = (1, "", "Logistics", "ItemTransport", b"", b"", "0x0", 0, 1, "0x0", True, "", "0x0", False)
+    chain = ChainClient.__new__(ChainClient)
+    chain.sent = []
+    chain.tm = NS(functions=NS(getAllTasks=lambda: call([task]),
+                               isExpired=lambda tid: call(is_expired),
+                               deadlineOf=lambda tid: call(123),
+                               expireTask=lambda tid: ("expire", tid)))
+    chain.send_tx = chain.sent.append
+    return chain
+
+
+def test_expiry_sweeper_off_when_contract_has_no_isExpired():
+    def revert():
+        raise ContractLogicError("execution reverted")
+    logs = []
+    run_expiry_sweeper(_sweeper_chain(revert), 0.01, log=logs.append)   # returns: sweeper off
+    assert logs[-1] == "task expiry: the deployed TaskManager has no execution timeouts - sweeper off"
+    assert not any("check failed" in line for line in logs)
+
+
+def test_expiry_sweeper_expires_overdue_task():
+    chain = _sweeper_chain(True)
+    assert chain.expire_overdue() == [(1, 123)]
+    assert chain.sent == [("expire", 1)]

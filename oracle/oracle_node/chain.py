@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 
 @dataclass
@@ -107,7 +108,13 @@ class ChainClient:
             task = Task.from_tuple(t)
             if task.status != 1 or not task.active:
                 continue
-            if not self.tm.functions.isExpired(task.id).call():
+            try:
+                expired_now = self.tm.functions.isExpired(task.id).call()
+            except ContractLogicError as e:
+                # the ABI has isExpired but the deployed contract does not (e.g. IE Coin
+                # on OP Sepolia): every call reverts, so there are no on-chain timeouts
+                raise AttributeError(f"deployed TaskManager has no isExpired ({e})") from e
+            if not expired_now:
                 continue
             deadline = int(self.tm.functions.deadlineOf(task.id).call())
             self.send_tx(self.tm.functions.expireTask(task.id))
