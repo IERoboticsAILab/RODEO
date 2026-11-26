@@ -115,7 +115,8 @@ class DaoListener(Node):
             reg=self.reg,
             checkpoint=Checkpoint(ckpt_path),
             on_event=self._on_event,
-            poll_interval=float(self.get_parameter("poll_interval_sec").value),
+            # ETH_POLL_INTERVAL_SEC: slower polling for rate-limited public RPCs
+            poll_interval=float(os.environ.get("ETH_POLL_INTERVAL_SEC") or self.get_parameter("poll_interval_sec").value),
             block_chunk=int(self.get_parameter("block_chunk").value),
         )
         self.poller.start()

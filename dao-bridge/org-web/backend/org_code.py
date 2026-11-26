@@ -2,6 +2,7 @@ from web3 import Web3
 import json
 import os
 import sys
+import threading
 import time
 from typing import Any, Dict, List, Tuple, Optional
 from decimal import Decimal, getcontext
@@ -182,8 +183,31 @@ def get_service_manager():
     _, sm = _mgr_addresses()
     return load_contract(sm, "ServiceManager")
 
+# One transaction at a time from the organization wallet (task timer thread and
+# API requests share it). On a public chain behind a load balancer, the node that
+# answers may lag: take the pending count, never below the last nonce used here.
+TX_LOCK = threading.RLock()
+_last_nonce = None
+
+
+def next_nonce() -> int:
+    """Next nonce for ORG_WALLET_ADDR; call with TX_LOCK held."""
+    n = web3.eth.get_transaction_count(ORG_WALLET_ADDR, "pending")
+    return n if _last_nonce is None else max(n, _last_nonce + 1)
+
+
+def note_nonce(n: int) -> None:
+    global _last_nonce
+    _last_nonce = n
+
+
 def send_tx(fn):
-    nonce = web3.eth.get_transaction_count(ORG_WALLET_ADDR)
+    with TX_LOCK:
+        return _send_tx_locked(fn)
+
+
+def _send_tx_locked(fn):
+    nonce = next_nonce()
     gas_price = web3.eth.gas_price
     gas_est = fn.estimate_gas({"from": ORG_WALLET_ADDR})
     tx = fn.build_transaction({
@@ -194,6 +218,7 @@ def send_tx(fn):
     })
     signed = web3.eth.account.sign_transaction(tx, private_key=ORG_WALLET_KEY)
     tx_hash = web3.eth.send_raw_transaction(signed.raw_transaction)
+    note_nonce(nonce)
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
     return receipt
 

@@ -45,6 +45,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _nonce_locks: dict[str, threading.Lock] = {}
 _nonce_locks_meta: threading.Lock = threading.Lock()
+# last nonce handed out per sender: the tx is broadcast after the lock is released,
+# and a lagging RPC node may not count it yet
+_last_nonce: dict[str, int] = {}
 
 
 def _nonce_lock_for(addr: str) -> threading.Lock:
@@ -95,7 +98,9 @@ def _build_base_tx(w3: Web3, sender: str, tx_cfg: TransactionCfg) -> dict:
 
     Must be called while holding the nonce lock for *sender*.
     """
-    nonce = w3.eth.get_transaction_count(sender)
+    nonce = w3.eth.get_transaction_count(sender, "pending")
+    if sender in _last_nonce:
+        nonce = max(nonce, _last_nonce[sender] + 1)
     tx: dict = {"from": sender, "nonce": nonce, "chainId": w3.eth.chain_id}
     if tx_cfg.max_fee_per_gas_wei and tx_cfg.max_priority_fee_per_gas_wei:
         tx["maxFeePerGas"] = tx_cfg.max_fee_per_gas_wei
@@ -161,10 +166,18 @@ def sign_and_send(
             gas = tx_cfg.gas_limit
         tx["gas"] = gas
         tx = contract_fn.build_transaction(tx)
+        _last_nonce[wallet.addr] = tx["nonce"]   # reserved; released below if not broadcast
 
     # Sign and broadcast outside the nonce lock to minimise contention
     signed = w3.eth.account.sign_transaction(tx, wallet.key)
-    txh = w3.eth.send_raw_transaction(signed.raw_transaction)
+    try:
+        txh = w3.eth.send_raw_transaction(signed.raw_transaction)
+    except Exception:
+        # not broadcast: don't leave a gap; the next tx re-reads the count
+        with _nonce_lock_for(wallet.addr):
+            if _last_nonce.get(wallet.addr) == tx["nonce"]:
+                _last_nonce.pop(wallet.addr, None)
+        raise
     hexh = txh.hex()
     logger.info("tx %s sent, waiting for %d confirmation(s)", hexh, max(1, min_conf))
     on_progress(TxProgress(state="pending", tx_hash=hexh, confirmations=0))

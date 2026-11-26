@@ -55,7 +55,9 @@ class ChainClient:
         self.oracle_addr = web3.to_checksum_address(settings.oracle_addr)
         self.oracle_key = settings.oracle_key
         self.contract = self.tm                   # used by the event watcher
-        self._tx_lock = threading.Lock()
+        # one transaction at a time: the event watcher and the expiry sweeper share the key
+        self._tx_lock = threading.RLock()
+        self._last_nonce = None
 
     def _contract(self, address, name):
         path: Path = self.settings.abi_path(name)
@@ -66,11 +68,14 @@ class ChainClient:
     # ------------------------------------------------------------------ transactions
     def send_tx(self, fn):
         with self._tx_lock:              # verdicts and the expiry sweeper share the nonce
-            return self._send_tx(fn)
+            return self._send_tx_locked(fn)
 
-    def _send_tx(self, fn):
+    def _send_tx_locked(self, fn):
+        # pending count, never below the last nonce used: the RPC node may lag
         s = self.settings
-        nonce = self.web3.eth.get_transaction_count(self.oracle_addr)
+        nonce = self.web3.eth.get_transaction_count(self.oracle_addr, "pending")
+        if self._last_nonce is not None:
+            nonce = max(nonce, self._last_nonce + 1)
         gas_price = s.gas_price_override or max(self.web3.eth.gas_price, s.min_gas_price)
         try:
             gas_est = fn.estimate_gas({"from": self.oracle_addr})
@@ -80,8 +85,9 @@ class ChainClient:
         tx = fn.build_transaction({"from": self.oracle_addr, "nonce": nonce,
                                    "gas": int(gas_est * s.gas_multiplier), "gasPrice": gas_price})
         signed = self.web3.eth.account.sign_transaction(tx, private_key=self.oracle_key)
-        return self.web3.eth.wait_for_transaction_receipt(
-            self.web3.eth.send_raw_transaction(signed.raw_transaction))
+        txh = self.web3.eth.send_raw_transaction(signed.raw_transaction)
+        self._last_nonce = nonce
+        return self.web3.eth.wait_for_transaction_receipt(txh)
 
     def approve(self, task_id: int):
         self.send_tx(self.tm.functions.oracleFulfill(task_id, True, ""))

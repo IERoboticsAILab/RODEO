@@ -25,6 +25,7 @@ x-oracle-env: &oracle_env
   - CLOCK_TOLERANCE_SEC=${CLOCK_TOLERANCE_SEC:-5}
   - CLOCK_CHECK=${CLOCK_CHECK:-duration}     # duration: no clock sync needed; absolute: old check
   - EXPIRE_EVERY_SEC=${EXPIRE_EVERY_SEC:-15} # send expireTask for tasks past their time limit (0 = off)
+  - EVENT_POLL_SEC=${EVENT_POLL_SEC:-2}       # how often to read new events (OP Sepolia public RPC: 10)
   - START_BLOCK=${START_BLOCK:-0}            # first block of the contracts' events (OP Sepolia 51608886)
   - LOG_CHUNK=${LOG_CHUNK:-10000}            # most blocks per log query (public RPC limit)
   - LEGACY_PROOFS=${LEGACY_PROOFS:-1}        # 0: refuse ROS 1 .bag / .csv proofs

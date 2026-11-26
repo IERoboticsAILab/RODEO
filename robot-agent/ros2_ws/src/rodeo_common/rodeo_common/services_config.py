@@ -25,6 +25,7 @@ what the oracle checks poses against and may be left null until measured.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -108,7 +109,8 @@ def parse_robot_config(d: dict) -> RobotConfig:
     robot = _req_str(d, "robot", "services.yaml")
     if not _IDENT.match(robot):
         raise ConfigError(f"robot '{robot}': use lowercase letters, digits and _ (it becomes the ROS namespace)")
-    wallet = _req_str(d, "wallet", "services.yaml")
+    # RODEO_WALLET overrides services.yaml, e.g. the robot's OP Sepolia wallet
+    wallet = os.environ.get("RODEO_WALLET", "").strip() or _req_str(d, "wallet", "services.yaml")
     if not _ADDR.match(wallet):
         raise ConfigError(f"wallet '{wallet}' is not an Ethereum address")
     if not wallet.startswith("0x"):

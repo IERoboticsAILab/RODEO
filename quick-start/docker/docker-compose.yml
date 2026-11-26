@@ -39,6 +39,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}       # same as the Panther's bridge
       - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}     # same as the Panther's bridge
       - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}   # same as the Panther's bridge
+      - RODEO_WALLET=${RODEO_WALLET:-}   # overrides services.yaml's wallet (OP Sepolia robot 0xF31E…917f)
     stop_grace_period: 30s
     restart: unless-stopped
 

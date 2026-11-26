@@ -21,6 +21,7 @@ class EventWatcher:
         s = chain.settings
         self.start_block = int(getattr(s, "start_block", 0))
         self.chunk = max(1, int(getattr(s, "log_chunk", 10000)))
+        self.poll_s = float(getattr(s, "event_poll_sec", 2))
 
     def _handle_request(self, e, on_request):
         tid = int(e["args"]["taskId"])
@@ -49,7 +50,15 @@ class EventWatcher:
 
     def start(self, on_request, on_verified=None, on_rejected=None):
         # look back up to 1000 blocks to catch requests made while the oracle was down
-        current_block = self.web3.eth.block_number
+        # retry: an RPC error here (e.g. 429 on a public RPC) must not end the watcher thread
+        while True:
+            try:
+                current_block = self.web3.eth.block_number
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"Event watcher: cannot read the block number yet ({e}); retrying")
+                if self.stop_event.wait(self.poll_s):
+                    return
         cursor = max(self.start_block, current_block - 1000)
         print(f"Starting event watcher from block {cursor} (current: {current_block})")
         print("Watching oracle requests and outcomes")
@@ -62,7 +71,7 @@ class EventWatcher:
                     cursor = hi + 1
             except Exception:  # noqa: BLE001 - keep watching (the range is retried), but say why
                 print("Event watcher error:\n" + traceback.format_exc())
-            self.stop_event.wait(2)
+            self.stop_event.wait(self.poll_s)
 
     def stop(self):
         self.stop_event.set()

@@ -20,6 +20,7 @@ services:
       - ETH_WALLET_ADDRESS=${ETH_WALLET_ADDRESS:-}
       - ETH_WALLET_KEYSTORE=${ETH_WALLET_KEYSTORE:-}
       - ROS_ETH_DAO_YAML=/config/dao.yaml
+      - ETH_POLL_INTERVAL_SEC=${ETH_POLL_INTERVAL_SEC:-}   # event polling (default 1 s; OP Sepolia public RPC: 5)
     volumes:
       # DAO_CONFIG=dao.opsepolia.yaml: IE Coin on OP Sepolia (with its own WALLET_PATH)
       - ./configs/${DAO_CONFIG:-dao.yaml}:/config/dao.yaml:ro

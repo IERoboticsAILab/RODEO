@@ -34,6 +34,7 @@ class Settings:
         # blocks one log query may cover (public RPCs limit the range)
         self.start_block = int(os.environ.get("START_BLOCK", "0") or 0)
         self.log_chunk = int(os.environ.get("LOG_CHUNK", "10000"))
+        self.event_poll_sec = float(os.environ.get("EVENT_POLL_SEC", "2") or 2)  # longer on a public RPC
         self.state_dir = os.environ.get("STATE_DIR", str(Path(__file__).parent.parent / "state"))
         # ORACLE_WATCH=0: console only, no chain watcher (e.g. next to the ROS 2 oracle)
         self.watch = os.environ.get("ORACLE_WATCH", "1") not in ("0", "false", "no")

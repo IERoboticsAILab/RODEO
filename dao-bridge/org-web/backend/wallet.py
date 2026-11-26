@@ -67,19 +67,22 @@ def config() -> dict:
 
 
 def _send_eth(to: str, amount_wei: int) -> str:
-    tx = {
-        "from": oc.ORG_WALLET_ADDR,
-        "to": to,
-        "value": amount_wei,
-        "nonce": oc.web3.eth.get_transaction_count(oc.ORG_WALLET_ADDR),
-        "gas": 21000,
-        "gasPrice": oc.web3.eth.gas_price,
-        "chainId": chain_id(),
-    }
-    signed = oc.web3.eth.account.sign_transaction(tx, private_key=oc.ORG_WALLET_KEY)
-    h = oc.web3.eth.send_raw_transaction(signed.raw_transaction)
-    oc.web3.eth.wait_for_transaction_receipt(h)
-    return h.hex()
+    with oc.TX_LOCK:  # same wallet as org_code.send_tx
+        nonce = oc.next_nonce()
+        tx = {
+            "from": oc.ORG_WALLET_ADDR,
+            "to": to,
+            "value": amount_wei,
+            "nonce": nonce,
+            "gas": 21000,
+            "gasPrice": oc.web3.eth.gas_price,
+            "chainId": chain_id(),
+        }
+        signed = oc.web3.eth.account.sign_transaction(tx, private_key=oc.ORG_WALLET_KEY)
+        h = oc.web3.eth.send_raw_transaction(signed.raw_transaction)
+        oc.note_nonce(nonce)
+        oc.web3.eth.wait_for_transaction_receipt(h)
+        return h.hex()
 
 
 def faucet(address: str) -> dict:

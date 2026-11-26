@@ -3,8 +3,8 @@
 # The public RPC has no websocket: both URLs are HTTP. No secrets here: the robot's
 # key is in the keystore (scripts/make_wallet.py).
 chain:
-  rpc_url: https://sepolia.optimism.io
-  http_fallback_url: https://sepolia.optimism.io
+  rpc_url: https://optimism-sepolia-rpc.publicnode.com
+  http_fallback_url: https://optimism-sepolia-rpc.publicnode.com
   chain_id: 11155420
 contracts:
   iecoin: "0x0235a0145303B013561FD1E9658F8eD8BA5629Bd"

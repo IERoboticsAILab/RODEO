@@ -217,8 +217,14 @@ class RodeoAgent(Node):
                                     f"{spec.price_iec} IEC)")
         self.service_ids = dict(plan.keep)
         if plan.register:                            # read back the ids of new services
-            after = plan_service_sync(self.cfg, self._own_services(), False)
-            self.service_ids = dict(after.keep)
+            # on a public chain the RPC node that answers may not have the new
+            # block yet: retry for a while instead of reporting MISSING
+            for attempt in range(10):
+                after = plan_service_sync(self.cfg, self._own_services(), False)
+                self.service_ids = dict(after.keep)
+                if not after.register:
+                    break
+                time.sleep(2.0)
         for spec in self.cfg.services:
             sid = self.service_ids.get((spec.category, spec.task_type))
             self.log.info(f"service '{spec.name}' -> id {sid if sid is not None else 'MISSING'}")
