@@ -116,9 +116,13 @@ def test_declared_weight():
 
 
 def test_legacy_waste_bags():
-    good = validate_bag(os.path.join(HERE, "..", "proofs", "task_tid10_20250910_145742.bag"))
+    good_bag = os.path.join(HERE, "..", "proofs", "task_tid10_20250910_145742.bag")
+    bad_bag = os.path.join(HERE, "..", "proofs", "task_tid1_20250904_164349.bag")
+    if not (os.path.exists(good_bag) and os.path.exists(bad_bag)):
+        pytest.skip("legacy sample bags (ROS 1) are not in the repo")
+    good = validate_bag(good_bag)
     assert good.ok and any("total 10.956 m" in l for l in good.lines)
-    bad = validate_bag(os.path.join(HERE, "..", "proofs", "task_tid1_20250904_164349.bag"))
+    bad = validate_bag(bad_bag)
     assert not bad.ok and bad.reason == "Disposal event missing or incorrect"
 
 
