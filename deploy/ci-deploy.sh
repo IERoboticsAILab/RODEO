@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Automatic deploy of RODEO to colossus, run by the GitHub runner there after CI passes
-# on main (.github/workflows/ci.yml). Same idea as IE Coin's deploy/ci-deploy.sh:
+# Automatic deploy of RODEO (org-web + oracle, no robots) to colossus, run by the GitHub
+# runner there after CI passes on main (.github/workflows/ci.yml). Same idea as IE Coin's
+# deploy/ci-deploy.sh:
 #   1. export this commit to /opt/rodeo/releases/<sha> (the stack's read-only configs)
-#   2. build the four images, tagged with the commit
+#   2. build the two images, tagged with the commit
 #   3. point the Portainer stack "rodeo" at them (stack env kept as is); the first run
 #      creates the stack, with its env read once from $FIRST_ENV
 #   4. health checks; if they fail, put the previous version back and fail the job
 #   5. keep the five newest image tags and releases
 #
 # Needs (one-time setup, deploy/DEPLOY.md): the Portainer access token in $TOKEN_FILE
-# (readable by the runner user only), /opt/rodeo owned by the runner user, and the
-# robot keystore at /etc/rodeo/wallet_opsepolia.json.
+# (readable by the runner user only) and /opt/rodeo owned by the runner user.
+# Robot stacks (bridge, agent, executor) are deployed from their own repos.
 set -euo pipefail
 
 export STACK=rodeo
@@ -26,7 +27,6 @@ export SHA
 
 [ -r "$TOKEN_FILE" ] || { echo "::error::No Portainer token at $TOKEN_FILE"; exit 1; }
 [ -w "$ROOT" ] || { echo "::error::$ROOT is missing or not writable by $(id -un)"; exit 1; }
-[ -e /etc/rodeo/wallet_opsepolia.json ] || { echo "::error::No robot keystore at /etc/rodeo/wallet_opsepolia.json"; exit 1; }
 
 echo "::group::Release $ROOT/releases/$SHA"
 mkdir -p "$ROOT/releases" "$ROOT/proofs" "$ROOT/state/org-web" "$ROOT/state/oracle"
@@ -46,8 +46,6 @@ build() {  # name dockerfile context [args...]
 }
 build rodeo-org-web dao-bridge/org-web/Dockerfile . --build-arg NEXT_PUBLIC_API_BASE=/api
 build rodeo-oracle  oracle/docker/Dockerfile .
-build rodeo-bridge  dao-bridge/ros2-eth-bridge/docker/Dockerfile dao-bridge/ros2-eth-bridge
-build rodeo-agent   robot-agent/docker/Dockerfile .
 
 export DEPLOY_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -104,14 +102,12 @@ else:
     old_compose = api("GET", f"/api/stacks/{stack_id}/file")["StackFileContent"]
     print(f"Updating stack {stack_name} (id {stack_id}) to {sha}")
     api("PUT", f"/api/stacks/{stack_id}?endpointId={endpoint}",
-        {"stackFileContent": compose, "env": env, "prune": False, "pullImage": False})
+        {"stackFileContent": compose, "env": env, "prune": True, "pullImage": False})
 
 # ------------------------------------------------------------------ health checks
 since = os.environ["DEPLOY_STARTED"]
 need_logs = {
-    "rodeo-bridge": ["dao_listener ready", "dao_writer ready"],
     "rodeo-oracle": ["Watching oracle requests"],
-    "rodeo-agent": ["ready - waiting for assignments"],
 }
 
 def running_tag(name):
@@ -155,7 +151,7 @@ while True:
         if old_compose is not None:
             print("Rolling back to the previous version")
             api("PUT", f"/api/stacks/{stack_id}?endpointId={endpoint}",
-                {"stackFileContent": old_compose, "env": env, "prune": False, "pullImage": False})
+                {"stackFileContent": old_compose, "env": env, "prune": True, "pullImage": False})
             sys.exit("::error::Deploy failed its health checks; the previous version is running again")
         sys.exit("::error::First deploy failed its health checks (nothing to roll back to)")
     time.sleep(5)
@@ -164,7 +160,7 @@ PY
 
 # Keep the five newest tags of each image and the five newest releases (in-use images
 # can't be removed anyway; the running release is always among the newest).
-for img in rodeo-org-web rodeo-oracle rodeo-bridge rodeo-agent; do
+for img in rodeo-org-web rodeo-oracle; do
   docker images "$img" --format '{{.Tag}}' | grep -vx "$SHA" | tail -n +5 | while read -r tag; do
     docker rmi "$img:$tag" >/dev/null 2>&1 || true
   done

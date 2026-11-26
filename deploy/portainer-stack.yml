@@ -1,4 +1,11 @@
-# RODEO on colossus (IE Coin on OP Sepolia): Portainer stack "rodeo".
+# RODEO on colossus (IE Coin on OP Sepolia): Portainer stack "rodeo", the lab's shared
+# marketplace side: org-web and the oracle. It needs no robot.
+#
+# Robots are separate stacks, one per robot, deployed from their own repo (the Panther:
+# IERoboticsAILab/robopreneur, branch panther-webapp, stack panther-webapp). Each holds
+# that robot's bridge (its own wallet), agent and executor, built from a pinned RODEO
+# release tag. Stopping a robot's stack takes only that robot off the marketplace.
+#
 # Deployed by deploy/ci-deploy.sh (the GitHub runner on colossus) after CI passes on
 # main; see deploy/DEPLOY.md. __SHA__ is replaced by the commit being deployed: the
 # image tags, and the release folder /opt/rodeo/releases/<sha> (a `git archive` of
@@ -8,26 +15,17 @@
 #   ORACLE_PRIVATE_KEY           oracle 0xE384…Ac4e
 #   ORGANIZATION_WALLET_PRIVATE  operator / Organization owner 0xdB3E…0146
 #   ORG_ADMIN_PIN                org-web admin PIN
-# The robot keystore is a file on colossus: /etc/rodeo/wallet_opsepolia.json (mode 600).
 # Everything else below has OP Sepolia defaults that the stack env may override.
 #
 # Only org-web is reachable, on 127.0.0.1:${ORG_WEB_PORT}, behind the host nginx
-# (deploy/nginx/rodeo.cyphy.life.conf). The ROS containers use the host network with
-# DDS on loopback only (CYCLONEDDS_URI below), so DDS stays on this machine; the Panther is reached through
-# the web app's zenoh bridge (robopreneur, branch panther-webapp, stack panther-webapp).
-# Proofs: /opt/rodeo/proofs, written by the web app, hashed by the agent, read by the oracle.
+# (deploy/nginx/rodeo.cyphy.life.conf). Proofs: robot stacks write them into
+# /opt/rodeo/proofs, the oracle reads them there (the robots' proof URIs are
+# file:///root/oracle/proofs/...).
 
 x-chain: &chain
   RPC_URL: ${RPC_URL:-https://optimism-sepolia-rpc.publicnode.com}
   ORGANIZATION_ADDRESS: ${ORGANIZATION_ADDRESS:-0xA0121b301f86e54d0E9Df8A5BDFF506C5815d426}
   IECOIN_ADDRESS: ${IECOIN_ADDRESS:-0x0235a0145303B013561FD1E9658F8eD8BA5629Bd}
-
-# DDS on loopback only, with unicast discovery (lo has no multicast). The panther-webapp
-# stack (web app + zenoh) uses the same value, so they all discover each other and nothing
-# leaves the machine. ROS_LOCALHOST_ONLY is not used: the zenoh bridge ignores it.
-x-ros: &ros
-  RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-  CYCLONEDDS_URI: '<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface name="lo"/></Interfaces><AllowMulticast>false</AllowMulticast></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>100</MaxAutoParticipantIndex><Peers><Peer Address="127.0.0.1"/></Peers></Discovery></Domain></CycloneDDS>'
 
 services:
   org-web:
@@ -71,8 +69,12 @@ services:
     ipc: host
     tty: true                     # unbuffered output, so `docker logs` shows the verdicts
     environment:
-      <<: [*chain, *ros]
-      ROS_DOMAIN_ID: "40"         # oracle + its validator nodes only
+      <<: *chain
+      # ROS only between the oracle and its own validator nodes: domain 40, which no
+      # robot stack uses, and DDS on loopback only (lo has no multicast: unicast discovery).
+      ROS_DOMAIN_ID: "40"
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      CYCLONEDDS_URI: '<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface name="lo"/></Interfaces><AllowMulticast>false</AllowMulticast></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>100</MaxAutoParticipantIndex><Peers><Peer Address="127.0.0.1"/></Peers></Discovery></Domain></CycloneDDS>'
       TASK_MANAGER_ADDRESS: ${TASK_MANAGER_ADDRESS:-0xddB7727600b2C3DD22737Bce371C6EdBC3184978}
       SERVICE_MANAGER_ADDRESS: ${SERVICE_MANAGER_ADDRESS:-0x0C3CCc95c02b4768706F0a2Bb53333E7d64587CA}
       ORACLE_ADDRESS: ${ORACLE_ADDRESS:-0xE38432ea907059d785954F17458722618B84Ac4e}
@@ -98,38 +100,3 @@ services:
       - /opt/rodeo/proofs:/workspace/proofs:ro
       - /opt/rodeo/proofs:/root/oracle/proofs:ro
       - /opt/rodeo/state/oracle:/workspace/state
-
-  bridge:
-    image: rodeo-bridge:__SHA__
-    container_name: rodeo-bridge
-    restart: unless-stopped
-    network_mode: host
-    ipc: host
-    environment:
-      <<: *ros
-      ROS_DOMAIN_ID: "41"         # the Panther web app's domain
-      ROBOT_NAMESPACE: panther
-      OWN_ASSIGNMENTS_ONLY: "true"
-      ETH_WALLET_PASSPHRASE: ${ETH_WALLET_PASSPHRASE:-}
-      ROS_ETH_DAO_YAML: /config/dao.yaml
-      ETH_POLL_INTERVAL_SEC: "5"
-    volumes:
-      - /opt/rodeo/releases/__SHA__/dao-bridge/ros2-eth-bridge/docker/configs/dao.opsepolia.yaml:/config/dao.yaml:ro
-      - /etc/rodeo/wallet_opsepolia.json:/root/.ros_eth/wallet.json:ro
-
-  agent:
-    image: rodeo-agent:__SHA__
-    container_name: rodeo-agent
-    restart: unless-stopped
-    network_mode: host
-    ipc: host
-    command: ["agent"]
-    stop_grace_period: 30s        # deactivates its service before it stops
-    environment:
-      <<: *ros
-      ROS_DOMAIN_ID: "41"
-      ROBOT_NAMESPACE: panther
-      RODEO_WALLET: ${RODEO_WALLET:-0xF31E405a68CAa3f021027395d7A7D2F6987d917f}
-    volumes:
-      - /opt/rodeo/releases/__SHA__/robot-agent/config/panther/services.yaml:/config/services.yaml:ro
-      - /opt/rodeo/proofs:/root/oracle/proofs
