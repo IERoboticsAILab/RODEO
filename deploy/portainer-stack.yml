@@ -12,8 +12,8 @@
 # Everything else below has OP Sepolia defaults that the stack env may override.
 #
 # Only org-web is reachable, on 127.0.0.1:${ORG_WEB_PORT}, behind the host nginx
-# (deploy/nginx/rodeo.cyphy.life.conf). The ROS containers use the host network but
-# ROS_LOCALHOST_ONLY=1, so DDS stays on this machine; the Panther is reached through
+# (deploy/nginx/rodeo.cyphy.life.conf). The ROS containers use the host network with
+# DDS on loopback only (CYCLONEDDS_URI below), so DDS stays on this machine; the Panther is reached through
 # the web app's zenoh bridge (robopreneur, branch panther-webapp, stack panther-webapp).
 # Proofs: /opt/rodeo/proofs, written by the web app, hashed by the agent, read by the oracle.
 
@@ -22,9 +22,12 @@ x-chain: &chain
   ORGANIZATION_ADDRESS: ${ORGANIZATION_ADDRESS:-0xA0121b301f86e54d0E9Df8A5BDFF506C5815d426}
   IECOIN_ADDRESS: ${IECOIN_ADDRESS:-0x0235a0145303B013561FD1E9658F8eD8BA5629Bd}
 
+# DDS on loopback only, with unicast discovery (lo has no multicast). The panther-webapp
+# stack (web app + zenoh) uses the same value, so they all discover each other and nothing
+# leaves the machine. ROS_LOCALHOST_ONLY is not used: the zenoh bridge ignores it.
 x-ros: &ros
   RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-  ROS_LOCALHOST_ONLY: "1"
+  CYCLONEDDS_URI: '<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface name="lo"/></Interfaces><AllowMulticast>false</AllowMulticast></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>100</MaxAutoParticipantIndex><Peers><Peer Address="127.0.0.1"/></Peers></Discovery></Domain></CycloneDDS>'
 
 services:
   org-web:
