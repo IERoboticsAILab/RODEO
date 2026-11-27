@@ -15,6 +15,9 @@ Each robot is its own stack, deployed from its own repo. It holds that robot's b
 - ROS domain: 41 Panther, 42 the next robot, …; 40 is the oracle's
 - zenoh port: 7448 Panther, 7449 the next robot, …
 
+Template for a new robot: [`robot-stack.example.yml`](robot-stack.example.yml), plus the guide in
+[robot-agent/README.md, "Adding a robot"](../robot-agent/README.md#8-adding-a-robot).
+
 Stopping a robot's stack takes only that robot off the marketplace. Its agent
 deactivates its services on the way down (30 s grace), and everything else keeps running.
 

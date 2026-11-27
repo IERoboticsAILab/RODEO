@@ -60,7 +60,9 @@ robotic_decentralized_organization/
 │
 ├── oracle/                    # Task verification oracle
 │
-├── quick-start/               # Demo without a robot: agent + fake executor
+├── quick-start/               # Demo without a robot: agent + fake executor; e2e.sh (whole task on Ganache)
+│
+├── deploy/                    # Server deploy (CI/CD): shared stack (org-web + oracle), robot stack template
 │
 └── scripts/                   # update-addresses.sh
 ```
@@ -326,14 +328,25 @@ Monitor the oracle logs to see the validation process:
 docker logs -f rodeo-oracle
 ```
 
+### Everything in one command
+
+`quick-start/e2e.sh` does steps 1–7 on its own, on a fresh Ganache, isolated from
+anything else running. It posts a Delivery task through org-web, has the fake executor
+deliver it, and passes when the oracle has verified it and the robot is paid. CI runs it
+on every push.
+
+```bash
+quick-start/e2e.sh
+```
+
 ### Step 8 (optional): a real robot instead of the fake executor
 
 A real robot replaces the fake executor with its own executor: something that
 serves `rodeo/execute_task` (`rodeo_interfaces/action/ExecuteTask`) in the
 robot's namespace and writes the proof with `rodeo_agent.proof_writer.ProofWriter`.
-The Panther's executor lives in its web app (branch `webapp` of
-[husarion-ugv-autonomy](https://github.com/Awai005/husarion-ugv-autonomy/tree/webapp),
-`README_rodeo_executor.md`). It has delivered org-web tasks in a Gazebo twin and
+The Panther's executor lives in its web app (IERoboticsAILab/robopreneur, branch
+`panther-webapp`, `README_rodeo_executor.md`). To add your own robot, follow
+[robot-agent/README.md, "Adding a robot"](robot-agent/README.md#8-adding-a-robot). It has delivered org-web tasks in a Gazebo twin and
 on the real Panther, verified by the oracle and paid.
 
 The robot's bridge, its agent and its executor must share:

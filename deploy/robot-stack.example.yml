@@ -1,0 +1,81 @@
+# A robot's RODEO stack: template. Copy it per robot and replace the <...> values.
+# The shared side (org-web + oracle) is deploy/portainer-stack.yml; each robot is its own
+# stack with its own bridge (one bridge per wallet), agent and executor. Stopping a robot's
+# stack takes only that robot off the marketplace: its agent deactivates its services.
+# Guide: robot-agent/README.md, "Adding a robot".
+#
+#   ROBOT             namespace, e.g. tiago (the agent serves <ROBOT>/rodeo/...)
+#   ROS_DOMAIN_ID     one per robot (40 is the oracle's; the Panther uses 41)
+#   ROBOT_WALLET      the robot's address (funded with ETH for gas on a real chain)
+#   keystore          /etc/rodeo/<robot>_wallet.json (dao-bridge/ros2-eth-bridge/scripts/make_wallet.py)
+#   services.yaml     robot-agent/config/<robot>/services.yaml (what it offers, places, prices)
+#   dao config        dao.yaml (local Ganache) or dao.opsepolia.yaml (IE Coin on OP Sepolia)
+#
+# Images: rodeo-bridge and rodeo-agent, built from this repo (pin a release tag in
+# production):
+#   docker build -f dao-bridge/ros2-eth-bridge/docker/Dockerfile -t rodeo-bridge:<tag> dao-bridge/ros2-eth-bridge
+#   docker build -f robot-agent/docker/Dockerfile -t rodeo-agent:<tag> .
+#
+# The executor defaults to the fake executor (simulated robot), so the stack runs end to
+# end before any robot code exists. For a real robot or a simulator, replace it with your
+# executor: anything that serves rodeo_interfaces/ExecuteTask at <ROBOT>/rodeo/execute_task
+# and writes the proof with rodeo_agent.proof_writer.ProofWriter into /root/oracle/proofs.
+#
+# DDS stays on the machine (loopback-only CYCLONEDDS_URI). If the robot is reached over the
+# network, add a zenoh bridge here (see the Panther's stack in IERoboticsAILab/robopreneur,
+# branch panther-webapp, for a complete example).
+
+x-dds: &dds '<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface name="lo"/></Interfaces><AllowMulticast>false</AllowMulticast></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>100</MaxAutoParticipantIndex><Peers><Peer Address="127.0.0.1"/></Peers></Discovery></Domain></CycloneDDS>'
+
+x-robot: &robot
+  ROS_DOMAIN_ID: "<42>"
+  ROBOT_NAMESPACE: <robot>
+  RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+  CYCLONEDDS_URI: *dds
+
+services:
+  bridge:
+    image: rodeo-bridge:<tag>
+    container_name: <robot>-bridge
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    environment:
+      <<: *robot
+      OWN_ASSIGNMENTS_ONLY: "true"
+      ETH_WALLET_ADDRESS: "<0xROBOT_WALLET>"
+      ETH_WALLET_PASSPHRASE: ${ETH_WALLET_PASSPHRASE:-}
+      ROS_ETH_DAO_YAML: /config/dao.yaml
+      ETH_POLL_INTERVAL_SEC: "5"
+    volumes:
+      - <path to RODEO>/dao-bridge/ros2-eth-bridge/docker/configs/<dao.opsepolia.yaml>:/config/dao.yaml:ro
+      - /etc/rodeo/<robot>_wallet.json:/root/.ros_eth/wallet.json:ro
+
+  agent:
+    image: rodeo-agent:<tag>
+    container_name: <robot>-agent
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    command: ["agent"]
+    stop_grace_period: 30s        # deactivates the robot's services before it stops
+    environment:
+      <<: *robot
+      RODEO_WALLET: "<0xROBOT_WALLET>"
+    volumes:
+      - <path to RODEO>/robot-agent/config/<robot>/services.yaml:/config/services.yaml:ro
+      - /opt/rodeo/proofs:/root/oracle/proofs
+
+  executor:                       # replace with your robot's executor
+    image: rodeo-agent:<tag>
+    container_name: <robot>-executor
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    command: ["fake-executor"]
+    environment:
+      <<: *robot
+      PROOF_MODE: rodeo
+    volumes:
+      - <path to RODEO>/robot-agent/config/<robot>/services.yaml:/config/services.yaml:ro
+      - /opt/rodeo/proofs:/root/oracle/proofs

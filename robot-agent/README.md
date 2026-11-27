@@ -215,3 +215,28 @@ a flat fee per session today. Options for later:
 | Flat fee per session (now) | one Charging service, one price | none |
 | Energy tiers | several services or task types (e.g. 25 %, 50 %, full), each priced base + rate x energy; the robot picks the smallest tier covering its deficit; the validator checks the tier's energy | none |
 | Metered | settle on delivered energy, refund the rest of the escrow | yes |
+
+## 8. Adding a robot
+
+Everything a new robot needs is in this repo. Go from simulated to real one step at a time.
+
+1. **What it offers:** write `robot-agent/config/<robot>/services.yaml`, using
+   `panther/services.yaml` (deliveries) or `station/services.yaml` (charging) as the
+   example. It lists the robot's wallet, services, prices and places (section 1).
+2. **Its wallet:** run `dao-bridge/ros2-eth-bridge/scripts/make_wallet.py --out ~/.ros_eth/<robot>_wallet.json`.
+   On Ganache, use one of the unused development accounts. On a real chain, use a new key
+   funded with ETH for gas. One bridge per wallet.
+3. **Its namespace and ROS domain:** one each per robot. The Panther uses `panther` and 41;
+   the oracle keeps 40 for itself.
+4. **Its executor:** serve `rodeo_interfaces/ExecuteTask` at `<robot>/rodeo/execute_task`
+   and write the proof with `rodeo_agent.proof_writer.ProofWriter` ("Writing an executor"
+   above). Start from `fake_executor.py` (simulated) or `station_executor.py`. The Panther's
+   executor (its web app in IERoboticsAILab/robopreneur, branch `panther-webapp`,
+   `scripts/demo/rodeo_executor.py`) is a complete real-robot example.
+5. **Test it on Ganache first.** `quick-start/e2e.sh` runs a whole task on a fresh local
+   chain with the fake executor. Then run the quick-start demo with your `services.yaml`
+   and executor, then a simulator, then the real robot.
+6. **Run it as its own stack:** copy `deploy/robot-stack.example.yml`, which has bridge,
+   agent and executor, with the fake executor as the default. The shared org-web and oracle
+   are `deploy/portainer-stack.yml`. In production, build the robot's images from a RODEO
+   release tag (`deploy/DEPLOY.md`, "Robots are separate stacks").

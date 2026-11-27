@@ -10,6 +10,7 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-rosbag2-py ros-humble-rosbag2-storage-mcap \
+      ros-humble-rmw-cyclonedds-cpp \
       python3-pip python3-yaml python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 

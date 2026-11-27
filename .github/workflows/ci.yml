@@ -60,12 +60,21 @@ jobs:
             python3 -m pytest -q -p no:pytest_ethereum -p no:cacheprovider tests'
       - name: org-web backend compiles
         run: python3 -m compileall -q dao-bridge/org-web/backend
-      - name: Stack file is valid
+      - name: Stack files are valid
         run: |
           sed 's/__SHA__/0000000/g' deploy/portainer-stack.yml > /tmp/stack.yml
           ORACLE_PRIVATE_KEY=x ORGANIZATION_WALLET_PRIVATE=x ORG_ADMIN_PIN=x \
             docker compose -p rodeo -f /tmp/stack.yml config -q
-          bash -n deploy/ci-deploy.sh
+          sed -e 's/<42>/42/; s/<robot>/tiago/g; s/<tag>/ci/g; s/<0xROBOT_WALLET>/0x0000000000000000000000000000000000000001/g' \
+              -e 's#<path to RODEO>#/opt/rodeo#g; s/<dao.opsepolia.yaml>/dao.yaml/' \
+              deploy/robot-stack.example.yml > /tmp/robot.yml
+          docker compose -p robot -f /tmp/robot.yml config -q
+          bash -n deploy/ci-deploy.sh quick-start/e2e.sh
+
+      # A whole task on a fresh Ganache: posted through org-web, delivered by the fake
+      # executor, verified by the oracle, paid. Same script as `quick-start/e2e.sh` locally.
+      - name: End to end on Ganache
+        run: E2E_TAG=ci quick-start/e2e.sh
 
   deploy:
     name: Deploy to colossus
