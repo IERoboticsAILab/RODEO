@@ -1,3 +1,7 @@
-# Oracle Node Python Dependencies
-web3==6.11.3
-eth-account
+# Oracle v2: plain Python, no ROS. eth-account is installed separately with
+# --no-deps (see the Dockerfile) to keep the web3 6.11.4 / hexbytes 0.3.1 set
+# that the bridge uses.
+web3==6.11.4
+websockets==13.1
+rosbags==0.11.9
+pyyaml

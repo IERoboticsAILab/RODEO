@@ -283,4 +283,4 @@ To add new interface templates:
 ---
 
 ## License
-MIT License - See [LICENSE](../../../LICENSE)
+MIT License - See [LICENSE](../../../LICENSE.md)

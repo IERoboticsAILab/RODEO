@@ -1,190 +1,149 @@
 # DAO Bridge
 
-Integration layer connecting RODEO blockchain infrastructure with robot systems and human operators. Provides both programmatic (ROS) and web-based interfaces for decentralized task coordination.
+Integration layer connecting the RODEO contracts with robots and human operators:
+a ROS 2 interface for robots and a web console for people.
 
 ## Components
 
-### [ros-eth-bridge](ros-eth-bridge/)
-ROS Noetic package enabling robots to interact with smart contracts through action servers and event publishers. Implements bidirectional Web3.py communication for autonomous agent participation in the DAO.
+### [ros2-eth-bridge](ros2-eth-bridge/)
+ROS 2 Humble package through which a robot uses the contracts: action servers
+for every write operation, query services, and event topics. One instance holds
+one wallet; run one per robot, each in its own namespace.
 
-**Key Features:**
-- 10 action servers for blockchain write operations (tasks, services, tokens)
-- Real-time event streaming from blockchain to ROS topics
-- Transaction management with nonce serialization
-- Support for both WebSocket and HTTP providers
-
-**Use Cases:** Autonomous robots registering services, bidding on tasks, submitting proofs, managing IECoin balances
+**Key features:**
+- 10 action servers for blockchain writes (tasks, services, tokens)
+- 8 query services and 7 event topics
+- `task_assigned` delivered only to the bridge whose wallet is the executor
+- Transaction management with per-wallet nonce serialisation
 
 ### [org-web](org-web/)
-Web dashboard for human operators to monitor and manage DAO activities. Combines FastAPI backend with Next.js frontend in a single Docker container.
+Web dashboard for human operators: FastAPI backend and Next.js frontend in a
+single Docker container.
 
-**Key Features:**
+**Key features:**
 - Task and service registry management
-- Token holder visualization
-- Transaction history monitoring
+- Token holder visualisation
 - RESTful API for external integrations
-
-**Use Cases:** Organization administrators, human coordinators, system monitoring
 
 ## Architecture
 
 ```
-┌─────────────────┐         ┌──────────────────┐
-│  Robot (ROS)    │         │  Human Operator  │
-│                 │         │                  │
-│  ros-eth-bridge │         │    org-web       │
-└────────┬────────┘         └────────┬─────────┘
-         │                           │
-         │      Web3.py/HTTP         │
-         └───────────┬───────────────┘
-                     │
-         ┌───────────▼────────────┐
-         │  Ethereum Blockchain   │
-         │  (Ganache/Public Net)  │
-         │                        │
-         │  • Organization.sol    │
-         │  • TaskManager.sol     │
-         │  • ServiceManager.sol  │
-         │  • IECoin.sol          │
-         └────────────────────────┘
+┌──────────────────┐         ┌──────────────────┐
+│  Robot (ROS 2)   │         │  Human Operator  │
+│                  │         │                  │
+│  ros2-eth-bridge │         │     org-web      │
+└────────┬─────────┘         └────────┬─────────┘
+         │                            │
+         │       Web3.py / HTTP       │
+         └─────────────┬──────────────┘
+                       │
+          ┌────────────▼───────────┐
+          │  Ethereum blockchain   │
+          │  (Ganache / public)    │
+          │                        │
+          │  • Organization.sol    │
+          │  • TaskManager.sol     │
+          │  • ServiceManager.sol  │
+          │  • IECoin.sol          │
+          └────────────────────────┘
 ```
 
 ## Quick Start
 
-**Prerequisites:**
-- Docker and Docker Compose
-- Ethereum compatible network (see [../blockchain-network/ganache-docker](../blockchain-network/ganache-docker/))
-- Deployed smart contracts with addresses (see [../blockchain-network/smart-contracts](../blockchain-network/smart-contracts/))
-- Funded robot, organization and human wallets with IEC
+**Prerequisites:** Docker with Compose v2, Ganache running with the contracts
+deployed (see [../blockchain-network](../blockchain-network/)), and funded robot,
+organization and human wallets.
 
-### ROS Bridge (Docker)
+### ROS 2 bridge (Docker)
 
 ```bash
-cd ros-eth-bridge/docker
+cd ros2-eth-bridge
 
-# 1. Update contract addresses in config
-nano configs/dao.yaml
+# 1. Robot keystore (once; press Enter for an empty dev passphrase)
+pip3 install eth-account
+python3 scripts/make_wallet.py
 
-# 2. Setup wallet (if not already done)
-mkdir -p ~/.ros_eth
-python3 configs/make_wallet.py
+# 2. Contract addresses: docker/configs/dao.yaml
+#    (scripts/update-addresses.sh at the repo root fills it in)
 
 # 3. Build and start
-./ros-eth-bridge-docker.sh build
-./ros-eth-bridge-docker.sh start
-
-# 4. Verify
-./ros-eth-bridge-docker.sh logs
+cd docker && docker compose up -d --build
+docker logs -f ros2-eth-bridge     # "dao_listener ready" and "dao_writer ready"
 ```
 
-📖 **See [ros-eth-bridge/docker/QUICKSTART.md](ros-eth-bridge/docker/QUICKSTART.md) for detailed setup**
+📖 See [ros2-eth-bridge/README.md](ros2-eth-bridge/README.md) for the interface and options.
 
-### Web Console (Docker)
+### Web console (Docker)
 
 ```bash
 cd org-web
-docker build -t org-console .
-docker run --env-file .env -p 8080:80 org-console
+docker compose up -d --build
 ```
 
-Access dashboard at `http://localhost:8080`
+Dashboard at `http://localhost:8080`.
 
 ## Configuration
 
-Both components require contract addresses from deployment:
+Both components need the deployed contract addresses:
 
-**ROS Bridge:** `ros-eth-bridge/docker/configs/dao.yaml`  
-**Web Console:** `org-web/.env` (environment variables)
+- **ROS 2 bridge:** `ros2-eth-bridge/docker/configs/dao.yaml`
+- **Web console:** `org-web/.env`
 
-### Update Contract Addresses
+After deploying, run from the repository root:
 
-After deploying smart contracts, update the configuration files:
-
-**For ROS Bridge:**
 ```bash
-cd ros-eth-bridge/docker
-nano configs/dao.yaml
-
-# Update these addresses:
-contracts:
-  iecoin: "0x..."              # From deployments/1337.json
-  organization: "0x..."
-  task_manager: "0x..."
-  service_manager: "0x..."
+./scripts/update-addresses.sh blockchain-network/smart-contracts/deployments/1337.json
 ```
 
-**For Web Console:**
+💡 On a fresh Ganache chain the standard deployment always produces the same
+addresses, which are the ones already committed.
+
+## Integration patterns
+
+The commands below run inside the bridge container
+(`docker exec -it ros2-eth-bridge bash`) or on any machine on the same
+`ROS_DOMAIN_ID` with `ros_eth_msgs` built. With a namespace, prefix the names
+(`/panther/dao/...`).
+
+### Robot to blockchain
+
 ```bash
-cd org-web
-cp .env.example .env
-nano .env
+# Register a service
+ros2 action send_goal /dao/register_service_action ros_eth_msgs/action/RegisterService \
+  "{name: 'DeliveryBot_A', description: 'Delivery robot', category: 'Logistics', service_type: 'ItemTransport', price: '50', provider_type: 0, min_confirmations: 1}"
 
-# Update these addresses:
-RPC_URL=http://localhost:8545
-ORGANIZATION_ADDRESS=0x...    # From deployments/1337.json
-IECOIN_ADDRESS=0x...
-ORGANIZATION_WALLET_PUBLIC=0x...   # Your organization wallet
-ORGANIZATION_WALLET_PRIVATE=0x...  # Your private key (keep secure!)
-```
-
-💡 **Tip:** Get contract addresses from `blockchain-network/smart-contracts/deployments/1337.json`
-
-## Integration Patterns
-
-### Robot-to-Blockchain
-
-Robots use ROS action servers to perform transactions.
-
-**Example: Register a robot service**
-```bash
-# Register a delivery robot service
-rostopic pub -1 /dao/register_service_action/goal ros_eth_msgs/RegisterServiceActionGoal \
-  '{goal: {name: "DeliveryBot_A", category: "Logistics", service_type: "Delivery", price: "50"}}'
-```
-
-**Other available actions:**
-```bash
-# Register a task
-rostopic pub -1 /dao/register_task_action/goal ros_eth_msgs/RegisterTaskActionGoal \
-  '{goal: {description: "Deliver package to Room 301", category: "Logistics", task_type: "Delivery", reward: "50", min_confirmations: 1}}'
+# Register a task (approves the TaskManager for the reward first)
+ros2 action send_goal /dao/register_task_action ros_eth_msgs/action/RegisterTask \
+  "{description: 'Deliver package to Room 301', category: 'Logistics', task_type: 'ItemTransport', reward: '50', min_confirmations: 1}"
 
 # Submit proof of task completion
-rostopic pub -1 /dao/submit_proof_action/goal ros_eth_msgs/SubmitProofActionGoal \
-  '{goal: {task_id: 1, proof_uri: "ipfs://Qm...", min_confirmations: 1}}'
+ros2 action send_goal /dao/submit_proof_action ros_eth_msgs/action/SubmitProof \
+  "{task_id: 1, proof_uri: 'file:///root/oracle/proofs/example.bag', min_confirmations: 1}"
 
-# Transfer IECoin tokens
-rostopic pub -1 /dao/transfer_token_action/goal ros_eth_msgs/TransferTokenActionGoal \
-  '{goal: {recipient: "0x...", amount: "100", min_confirmations: 1}}'
+# Transfer IECoin
+ros2 action send_goal /dao/transfer_token_action ros_eth_msgs/action/TransferToken \
+  "{to: '0x...', amount: '100', min_confirmations: 1}"
 ```
 
-**Query blockchain state:**
+### Query blockchain state
+
 ```bash
-# Get all services
-rosservice call /dao/get_all_services
-
-# Get all tasks
-rosservice call /dao/get_all_tasks
-
-# Check token balance
-rosservice call /dao/get_balance '{address: "0x..."}'
+ros2 service call /dao/get_all_services ros_eth_msgs/srv/GetAllServices
+ros2 service call /dao/get_all_tasks ros_eth_msgs/srv/GetAllTasks
+ros2 service call /dao/get_balance ros_eth_msgs/srv/GetBalance "{owner: ''}"   # '' = this wallet
 ```
 
-### Blockchain-to-Robot
+### Blockchain to robot
 
-Robots subscribe to event topics for task assignments:
 ```bash
-# Monitor task assignments
-rostopic echo /dao/task_assigned
-
-# Monitor service registrations
-rostopic echo /dao/service_registered
-
-# Monitor task verifications
-rostopic echo /dao/task_verified
+ros2 topic echo /dao/task_assigned
+ros2 topic echo /dao/service_registered
+ros2 topic echo /dao/task_verified
 ```
 
 ## Documentation
 
-- **ROS Bridge:** [ros-eth-bridge/README.md](ros-eth-bridge/README.md)
-- **Web Console:** [org-web/README.md](org-web/README.md)
-- **Smart Contracts:** [../blockchain-network/smart-contracts/README.md](../blockchain-network/smart-contracts/README.md)
+- **ROS 2 bridge:** [ros2-eth-bridge/README.md](ros2-eth-bridge/README.md)
+- **Web console:** [org-web/README.md](org-web/README.md)
+- **Smart contracts:** [../blockchain-network/smart-contracts/README.md](../blockchain-network/smart-contracts/README.md)
+- **Robot standard (services.yaml, execute_task, proofs):** [../robot-agent/README.md](../robot-agent/README.md)

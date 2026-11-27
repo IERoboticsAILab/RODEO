@@ -1,0 +1,24 @@
+# Default config packaged with ros_eth_bridge. In Docker, docker/configs/dao.yaml
+# is mounted over it. Relative abi_paths resolve against the package share dir.
+chain:
+  rpc_url: ws://127.0.0.1:8545
+  http_fallback_url: http://127.0.0.1:8545
+  chain_id: 1337
+contracts:
+  iecoin: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  organization: "0x8464135c8F25Da09e49BC8782676a84730C318bC"
+  task_manager: "0x712516e61C8B383dF4A63CFe83d7701Bce54B03e"
+  service_manager: "0x71C95911E9a5D330f4D621842EC243EE1343292e"
+abi_paths:
+  iecoin: "abi/IECoin.json"
+  organization: "abi/Organization.json"
+  task_manager: "abi/TaskManager.json"
+  service_manager: "abi/ServiceManager.json"
+wallet:
+  keystore_path: ~/.ros_eth/wallet.json
+  address: "15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+transaction:
+  confirmations: 1
+  max_retries: 5
+  gas_limit: 3000000
+  gas_multiplier: 1.3

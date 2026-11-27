@@ -50,7 +50,7 @@ curl -X POST http://localhost:8545 \
 - Ganache local Ethereum blockchain on port 8545
 - 20 pre-funded test accounts
 - Chain ID: 1337
-- Persisted data in `ganache_db/` volume
+- Persisted data in `ganache_db/` volume (local only, not committed) (local only, not committed)
 
 #### Step 2: Deploy Smart Contracts (Docker)
 ```bash
@@ -112,4 +112,4 @@ TaskManager:     0x49A1cc3dDE359E254c48808E4bD83e331A3cC311
 ---
 
 ## License
-MIT License - See [LICENSE](../LICENSE)
+MIT License - See [LICENSE](../LICENSE.md)

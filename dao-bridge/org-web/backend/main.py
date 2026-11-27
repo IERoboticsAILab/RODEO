@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
@@ -10,10 +10,55 @@ from org_code import (
     manager_addresses, ORG_CONTRACT_ADDR, Web3,
     list_iecoin_holders, IECOIN_ADDR,
     TOKEN_SYMBOL, TOKEN_DECIMALS,
-    deposit_to_organization, iecoin, organization
+    deposit_to_organization, iecoin, organization, task_funds_wei, ORG_WALLET_ADDR,
+    category_timeouts, timeouts_on_chain, get_task_manager, web3,
 )
 
+from catalog import build_catalog, find, task_description
+import wallet
+import task_timer
+
+import hmac
+import os
+import time
+
+# ---------- Admin: who may make the console sign with the organization's key ----------
+# ORG_ADMIN_PIN unset: the organization's wallet cannot be used from the console
+# at all (people post with their own wallets). Set: requests that sign with the
+# organization's key need the PIN in the X-Admin-Pin header.
+ADMIN_PIN = os.environ.get("ORG_ADMIN_PIN", "")
+
+
+def require_admin(x_admin_pin: Optional[str] = Header(default=None)) -> None:
+    if not ADMIN_PIN:
+        raise HTTPException(status_code=403, detail="the organization's wallet is not available on this "
+                                                    "console (ORG_ADMIN_PIN is not set): connect a wallet")
+    if not x_admin_pin or not hmac.compare_digest(x_admin_pin, ADMIN_PIN):
+        time.sleep(1.0)                       # slow down guessing
+        raise HTTPException(status_code=401, detail="admin PIN required for the organization's wallet")
+
+
+ADMIN = [Depends(require_admin)]
+
 app = FastAPI(title="Organization Console API")
+
+# Time limits kept here when the TaskManager has none on chain (task_timer.py)
+TIMER = None
+
+
+@app.on_event("startup")
+def _start_task_timer() -> None:
+    global TIMER
+    try:
+        TIMER = task_timer.start_from_env(
+            web3, get_task_manager, list_all_tasks, unassign_task, timeouts_on_chain(),
+            log=lambda m: print(m, flush=True))
+    except Exception as e:                   # the console still works without it
+        print(f"task timer: not started: {e}", flush=True)
+
+
+def _timed(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return TIMER.annotate(rows) if TIMER else rows
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,10 +69,13 @@ app.add_middleware(
 )
 
 class TaskCreate(BaseModel):
-    description: str
+    title: str = ""                             # the task's name (stored in the description)
+    description: str = ""                       # free text; with params it is the task's note
     category: str
     taskType: str
     rewardIec: float = Field(gt=0)
+    # RODEO v2 services: parameters from the catalog's schema (None = free-text task)
+    params: Optional[Dict[str, Any]] = None
 
 class TaskId(BaseModel):
     taskId: int
@@ -61,11 +109,11 @@ def contracts() -> Dict[str, str]:
 
 @app.get("/tasks")
 def tasks() -> List[Dict[str, Any]]:
-    return list_all_tasks()
+    return _timed(list_all_tasks())
 
 @app.get("/tasks/by-creator")
 def tasks_by_creator(creator: str = ORG_CONTRACT_ADDR) -> List[Dict[str, Any]]:
-    return get_tasks_by_creator(creator)
+    return _timed(get_tasks_by_creator(creator))
 
 @app.get("/tasks/assigned-to-org")
 def tasks_assigned_to_org() -> List[Dict[str, Any]]:
@@ -74,36 +122,112 @@ def tasks_assigned_to_org() -> List[Dict[str, Any]]:
 
 # ---------- Task writes ----------
 
-@app.post("/tasks/register")
-def tasks_register(body: TaskCreate) -> Dict[str, str]:
+@app.get("/catalog")
+def catalog() -> List[Dict[str, Any]]:
+    """What can be ordered now: one entry per kind of active service (see catalog.py).
+    An entry whose category has an execution time limit gets ``timeoutS``."""
+    entries = build_catalog(list_all_services())
+    limits = TIMER.limits if TIMER else category_timeouts(e["category"] for e in entries)
+    for e in entries:
+        if e["category"] in limits:
+            e["timeoutS"] = limits[e["category"]]
+    return entries
+
+
+def _checked_description(body: "TaskCreate") -> str:
+    """The task's description after the catalog checks (shared by both ways of posting)."""
+    if body.params is None:
+        return body.description
+    services = list_all_services()
+    entry = find(build_catalog(services), body.category, body.taskType)
+    if entry is None:
+        raise ValueError(f"no active service offers {body.category}/{body.taskType}")
+    if body.rewardIec < entry["minPriceIec"]:
+        raise ValueError(f"reward {body.rewardIec:g} IEC is below the lowest price "
+                         f"{entry['minPriceIec']:g} IEC: no provider would take it")
+    return task_description(services, body.category, body.taskType,
+                            body.params, body.description, body.title)
+
+
+@app.get("/admin/status")
+def admin_status() -> Dict[str, bool]:
+    """Whether an admin PIN is configured (the organization's wallet can be used at all)."""
+    return {"enabled": bool(ADMIN_PIN)}
+
+
+@app.post("/admin/check", dependencies=ADMIN)
+def admin_check() -> Dict[str, bool]:
+    """200 if the X-Admin-Pin header is right; used by the page to unlock admin controls."""
+    return {"ok": True}
+
+
+@app.get("/wallet/config")
+def wallet_config() -> Dict[str, Any]:
+    """What the browser needs to connect MetaMask and post from the user's wallet (see wallet.py)."""
+    return wallet.config()
+
+
+@app.post("/tasks/prepare")
+def tasks_prepare(body: TaskCreate) -> Dict[str, Any]:
+    """Checks a task like /tasks/register, but returns it for the user's wallet to sign and pay."""
     try:
-        tx = register_task(body.description, body.category, body.taskType, body.rewardIec)
+        description = _checked_description(body)
+        return {"description": description, "category": body.category, "taskType": body.taskType,
+                "rewardWei": str(Web3.to_wei(body.rewardIec, "ether")),
+                "taskManager": wallet.config()["taskManager"]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class FaucetRequest(BaseModel):
+    address: str
+
+
+@app.post("/faucet")
+def faucet(body: FaucetRequest) -> Dict[str, Any]:
+    """Local chain only: test ETH and IEC for a new wallet (see wallet.py)."""
+    try:
+        return wallet.faucet(body.address)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/tasks/register", dependencies=ADMIN)
+def tasks_register(body: TaskCreate) -> Dict[str, str]:
+    """Posts a task paid by the Organization (the console's own wallet signs)."""
+    try:
+        description = _checked_description(body)
+        funds = task_funds_wei()
+        if funds < Web3.to_wei(body.rewardIec, "ether"):
+            raise ValueError(f"the organization has {funds / 10**18:g} IEC left for tasks, less than the "
+                             f"{body.rewardIec:g} IEC reward: deposit more IEC (Home page, Organization task funds)")
+        tx = register_task(description, body.category, body.taskType, body.rewardIec)
         return {"txHash": tx}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/remove")
+@app.post("/tasks/remove", dependencies=ADMIN)
 def tasks_remove(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": remove_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/activate")
+@app.post("/tasks/activate", dependencies=ADMIN)
 def tasks_activate(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": activate_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/unassign")
+@app.post("/tasks/unassign", dependencies=ADMIN)
 def tasks_unassign(body: TaskId) -> Dict[str, str]:
     try:
         return {"txHash": unassign_task(body.taskId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/tasks/submit-proof")
+@app.post("/tasks/submit-proof", dependencies=ADMIN)
 def tasks_submit_proof(body: Proof) -> Dict[str, str]:
     try:
         return {"txHash": submit_proof_as_executor(body.taskId, body.proofURI)}
@@ -122,28 +246,28 @@ def services_by_creator(creator: str = ORG_CONTRACT_ADDR) -> List[Dict[str, Any]
 
 # ---------- Service writes ----------
 
-@app.post("/services/register")
+@app.post("/services/register", dependencies=ADMIN)
 def services_register(body: ServiceCreate) -> Dict[str, str]:
     try:
         return {"txHash": register_service(body.name, body.description, body.category, body.serviceType, body.priceIec)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/remove")
+@app.post("/services/remove", dependencies=ADMIN)
 def services_remove(body: ServiceId) -> Dict[str, str]:
     try:
         return {"txHash": remove_service(body.serviceId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/activate")
+@app.post("/services/activate", dependencies=ADMIN)
 def services_activate(body: ServiceId) -> Dict[str, str]:
     try:
         return {"txHash": activate_service(body.serviceId)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/services/set-busy")
+@app.post("/services/set-busy", dependencies=ADMIN)
 def services_set_busy(body: Busy) -> Dict[str, str]:
     try:
         return {"txHash": set_service_busy(body.index, body.isBusy)}
@@ -187,11 +311,14 @@ def organization_balance() -> Dict[str, Any]:
             "balanceIec": float(web3.from_wei(org_balance, "ether")),
             "allowanceWei": str(allowance),
             "allowanceIec": float(web3.from_wei(allowance, "ether")),
+            # what new tasks can use, and what the organization's wallet could deposit
+            "taskFundsIec": float(web3.from_wei(task_funds_wei(), "ether")),
+            "walletIec": float(web3.from_wei(iecoin.functions.balanceOf(ORG_WALLET_ADDR).call(), "ether")),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/organization/deposit")
+@app.post("/organization/deposit", dependencies=ADMIN)
 def organization_deposit(body: DepositAmount) -> Dict[str, str]:
     """Deposit IEC tokens into Organization contract for task funding"""
     try:

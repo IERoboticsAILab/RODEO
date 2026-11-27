@@ -1,0 +1,16 @@
+package.xml
+setup.cfg
+setup.py
+resource/rodeo_common
+rodeo_common/__init__.py
+rodeo_common/description.py
+rodeo_common/proof.py
+rodeo_common/service_description.py
+rodeo_common/services_config.py
+rodeo_common.egg-info/PKG-INFO
+rodeo_common.egg-info/SOURCES.txt
+rodeo_common.egg-info/dependency_links.txt
+rodeo_common.egg-info/requires.txt
+rodeo_common.egg-info/top_level.txt
+rodeo_common.egg-info/zip-safe
+test/test_rodeo_common.py

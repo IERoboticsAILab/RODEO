@@ -2,6 +2,8 @@ from web3 import Web3
 import json
 import os
 import sys
+import threading
+import time
 from typing import Any, Dict, List, Tuple, Optional
 from decimal import Decimal, getcontext
 from hexbytes import HexBytes
@@ -181,8 +183,31 @@ def get_service_manager():
     _, sm = _mgr_addresses()
     return load_contract(sm, "ServiceManager")
 
+# One transaction at a time from the organization wallet (task timer thread and
+# API requests share it). On a public chain behind a load balancer, the node that
+# answers may lag: take the pending count, never below the last nonce used here.
+TX_LOCK = threading.RLock()
+_last_nonce = None
+
+
+def next_nonce() -> int:
+    """Next nonce for ORG_WALLET_ADDR; call with TX_LOCK held."""
+    n = web3.eth.get_transaction_count(ORG_WALLET_ADDR, "pending")
+    return n if _last_nonce is None else max(n, _last_nonce + 1)
+
+
+def note_nonce(n: int) -> None:
+    global _last_nonce
+    _last_nonce = n
+
+
 def send_tx(fn):
-    nonce = web3.eth.get_transaction_count(ORG_WALLET_ADDR)
+    with TX_LOCK:
+        return _send_tx_locked(fn)
+
+
+def _send_tx_locked(fn):
+    nonce = next_nonce()
     gas_price = web3.eth.gas_price
     gas_est = fn.estimate_gas({"from": ORG_WALLET_ADDR})
     tx = fn.build_transaction({
@@ -193,6 +218,7 @@ def send_tx(fn):
     })
     signed = web3.eth.account.sign_transaction(tx, private_key=ORG_WALLET_KEY)
     tx_hash = web3.eth.send_raw_transaction(signed.raw_transaction)
+    note_nonce(nonce)
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
     return receipt
 
@@ -234,10 +260,29 @@ def remove_service(service_id: int) -> str:
     return rcpt.transactionHash.hex()
 
 def deposit_to_organization(amount_iec: float) -> str:
-    """Deposit IEC tokens into Organization contract for task rewards"""
+    """
+    Deposit IEC from the organization's wallet into the Organization contract,
+    which funds the tasks it posts. The contract pulls the IEC with
+    transferFrom, so the wallet first approves it for the amount.
+
+    Note: Organization.deposit *sets* the TaskManager's allowance to the amount
+    deposited (it does not add to it), so after a deposit the funds available
+    for tasks equal that deposit; any unspent remainder of earlier deposits or
+    refunds stays in the contract unusable (a contract issue).
+    """
     amount_wei = web3.to_wei(amount_iec, "ether")
+    if iecoin.functions.balanceOf(ORG_WALLET_ADDR).call() < amount_wei:
+        raise ValueError(f"the organization's wallet holds less than {amount_iec:g} IEC")
+    send_tx(iecoin.functions.approve(organization.address, amount_wei))
     rcpt = send_tx(organization.functions.deposit(amount_wei))
     return rcpt.transactionHash.hex()
+
+
+def task_funds_wei() -> int:
+    """IEC the Organization can still put into tasks (its TaskManager allowance, capped by its balance)."""
+    tm_addr = organization.functions.taskManager().call()
+    allowance = iecoin.functions.allowance(organization.address, tm_addr).call()
+    return min(allowance, iecoin.functions.balanceOf(organization.address).call())
 
 def set_service_busy(index: int, is_busy: bool) -> str:
     rcpt = send_tx(organization.functions.setServiceBusy(index, is_busy))
@@ -248,7 +293,7 @@ def set_service_busy(index: int, is_busy: bool) -> str:
 def list_all_tasks() -> list:
     tm = get_task_manager()
     rows = tm.functions.getAllTasks().call()
-    return [_normalize_task(t) for t in rows]
+    return _with_timeouts([_normalize_task(t) for t in rows])
 
 def get_tasks_by_creator(creator: str) -> list:
     tm = get_task_manager()
@@ -257,7 +302,7 @@ def get_tasks_by_creator(creator: str) -> list:
     for tid in ids:
         t = tm.functions.getTask(tid).call()
         tasks.append(_normalize_task(t))
-    return tasks
+    return _with_timeouts(tasks)
 
 def list_all_services() -> list:
     sm = get_service_manager()
@@ -272,6 +317,75 @@ def get_services_by_creator(creator: str) -> list:
         s = sm.functions.getService(sid).call()
         out.append(_normalize_service(s))
     return out
+
+# ---------- Execution time limits (TaskManager.categoryTimeout etc.) ----------
+# A category may have a limit (Logistics: 900 s), counted from the assignment and
+# enforced by the contract. Rows of categories without one get no timeout fields,
+# so the page shows nothing for them. A TaskManager deployed before the limits
+# existed has no such functions: then no row gets them.
+_HAS_TIMEOUTS: Optional[bool] = None
+
+
+def _timeouts_supported(tm) -> bool:
+    global _HAS_TIMEOUTS
+    if _HAS_TIMEOUTS is None:
+        try:
+            tm.functions.categoryTimeout(b"\0" * 32).call()
+            _HAS_TIMEOUTS = True
+        except Exception:
+            _HAS_TIMEOUTS = False
+    return _HAS_TIMEOUTS
+
+
+def timeouts_on_chain() -> bool:
+    """True when the TaskManager enforces execution time limits itself."""
+    return _timeouts_supported(get_task_manager())
+
+
+def category_timeouts(categories) -> Dict[str, int]:
+    """{category: seconds} for the categories that have a time limit."""
+    tm = get_task_manager()
+    if not _timeouts_supported(tm):
+        return {}
+    out = {}
+    for c in set(categories):
+        sec = int(tm.functions.categoryTimeout(Web3.keccak(text=c)).call())
+        if sec:
+            out[c] = sec
+    return out
+
+
+def _with_timeouts(tasks: list) -> list:
+    """
+    Adds to each row with a time limit:
+      timeoutS     the limit: fixed at the assignment for assigned/executed tasks,
+                   the category's current one for unassigned tasks
+      deadline     assigned tasks: block time (unix s) by which the proof must be in
+      secondsLeft  assigned tasks: deadline - now (negative: overdue, the oracle
+                   expires it within EXPIRE_EVERY_SEC)
+      proofInTime  assigned tasks: the proof was submitted before the deadline
+    """
+    tm = get_task_manager()
+    if not tasks or not _timeouts_supported(tm):
+        return tasks
+    by_cat = category_timeouts(t["taskCategory"] for t in tasks if t["status"] == 0)
+    now = int(time.time())
+    for t in tasks:
+        if t["status"] == 0:
+            if t["taskCategory"] in by_cat:
+                t["timeoutS"] = by_cat[t["taskCategory"]]
+            continue
+        limit = int(tm.functions.taskTimeout(t["id"]).call())
+        if not limit:
+            continue
+        t["timeoutS"] = limit
+        if t["status"] == 1:
+            deadline = int(tm.functions.assignedAt(t["id"]).call()) + limit
+            t["deadline"] = deadline
+            t["secondsLeft"] = deadline - now
+            t["proofInTime"] = int(tm.functions.proofAt(t["id"]).call()) != 0
+    return tasks
+
 
 def _normalize_task(t) -> Dict[str, Any]:
     # matches TaskManager.Task tuple

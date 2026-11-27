@@ -4,7 +4,7 @@ This directory contains the Docker configuration for running the RODEO Oracle No
 
 ## Overview
 
-The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. It runs in a ROS Noetic environment to support .bag file validation.
+The Oracle Node validates task proofs submitted by robots and interacts with the blockchain to approve or reject task completions. By default it runs the ROS 2 oracle (oracle and validator nodes, `Dockerfile`); a pure-Python oracle with the same checks is available as the `oracle-python` service (`--profile python`, `Dockerfile.python`).
 
 ## Prerequisites
 
@@ -19,7 +19,8 @@ The oracle supports two configuration methods:
 
 ### Method 1: Environment Variables (.env file) - Recommended
 
-1. Copy the example configuration:
+1. Copy the example configuration. `.env` is local: it holds the oracle key and
+   is not in git.
    ```bash
    cp .env.example .env
    ```
@@ -79,7 +80,12 @@ To view logs:
 docker compose logs -f oracle
 # or
 ./oracle-docker.sh logs
+docker logs -f rodeo-oracle               # by container name, from anywhere
+docker logs --since 10m rodeo-oracle
 ```
+
+The oracle code is copied into the image, so rebuild after changing a validator:
+`docker compose up -d --build oracle`.
 
 You should see:
 ```
@@ -89,16 +95,18 @@ Watching oracle requests and outcomes...
 
 ### 3. Interact with the Oracle
 
-Attach to the running container for interactive menu:
+Open the interactive menu next to the running ROS 2 oracle (no second chain watcher):
 
 ```bash
-docker attach rodeo-oracle
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
+
+With the Python oracle (`--profile python`), attach to it: `docker attach rodeo-oracle-python`.
 
 Or execute commands directly:
 
 ```bash
-docker exec -it rodeo-oracle python3 -m oracle_node.main
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
 
 ### 5. Stop the Oracle
@@ -127,7 +135,7 @@ docker run -it --rm \
   -e RPC_URL=http://10.205.10.9:8545 \
   -e ADDRESSES_JSON=/workspace/addresses.json \
   -e BASE_ABI=/workspace/abi \
-  -v $(pwd)/dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi:/workspace/abi:ro \
+  -v $(pwd)/dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro \
   -v $(pwd)/oracle:/workspace/bags:ro \
   rodeo-oracle:latest
 ```

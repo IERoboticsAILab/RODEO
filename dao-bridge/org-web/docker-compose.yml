@@ -1,8 +1,8 @@
 services:
   org-web:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..                      # repo root (for robot-agent's rodeo_common)
+      dockerfile: dao-bridge/org-web/Dockerfile
       args:
         # baked into the client bundle at build time
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-/api}
@@ -12,9 +12,20 @@ services:
     extra_hosts:
       # reach Ganache published on the host (required on Linux)
       - "host.docker.internal:host-gateway"
+    # Admin PIN (ORG_ADMIN_PIN) lives in .env.admin, which is not committed;
+    # without it the organization's wallet can't be used from the console.
+    env_file:
+      - path: .env.admin
+        required: false
     environment:
       # Blockchain Configuration
       - RPC_URL=${RPC_URL:-http://localhost:8545}
+
+      # Wallets (MetaMask): the RPC URL as seen from the user's browser, and the
+      # local-chain faucet (on by default on chain 1337 only)
+      - WALLET_RPC_URL=${WALLET_RPC_URL:-http://localhost:8545}
+      - WALLET_CHAIN_NAME=${WALLET_CHAIN_NAME:-RODEO local}
+      - DEV_FAUCET=${DEV_FAUCET:-}
       
       # Contract Addresses
       - ORGANIZATION_ADDRESS=${ORGANIZATION_ADDRESS}
@@ -36,9 +47,19 @@ services:
       
       # Optional: IECoin deployment block (for optimization)
       - IECOIN_DEPLOY_BLOCK=${IECOIN_DEPLOY_BLOCK:-0}
+
+      # Execution time limits kept by org-web when the TaskManager has none on
+      # chain (task_timer.py): category=seconds, from each task's assignment.
+      - ORG_TASK_TIMEOUTS=${ORG_TASK_TIMEOUTS:-Logistics=900}
+      - ORG_TIMER_EVERY_S=${ORG_TIMER_EVERY_S:-10}
+      - ORG_START_BLOCK=${ORG_START_BLOCK:-0}       # first block to read TaskAssigned from
+      - ORG_LOG_CHUNK=${ORG_LOG_CHUNK:-2000}
     volumes:
       # Mount contract ABIs (read-only)
       - ./backend/contracts:/app/contracts:ro
+
+      # task_timer.py remembers assignment times here (no rescan after a restart)
+      - ./state:/app/state
       
       # Optional: Mount addresses.json if not using env vars
       # - ./backend/addresses.json:/app/addresses.json:ro

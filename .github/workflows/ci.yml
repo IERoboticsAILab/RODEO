@@ -1,0 +1,97 @@
+# Checks every push and pull request: builds the four images and runs the oracle tests.
+# A push to main that passes is then deployed by the runner on colossus
+# (deploy/ci-deploy.sh): images built there, Portainer stack "rodeo" updated, health
+# checked, rolled back on failure. Setup: deploy/DEPLOY.md.
+#
+# This repo is public: the deploy job runs only for pushes to main (never for pull
+# requests), only on the self-hosted runner registered to this repo, and only once the
+# repo variable DEPLOY_ENABLED is "true".
+name: CI
+
+on:
+  push:
+    branches: [main, rodeo-v2]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Build images, oracle tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build org-web
+        run: >
+          docker buildx build --load -t rodeo-org-web:ci
+          --cache-from type=gha,scope=org-web --cache-to type=gha,mode=max,scope=org-web
+          --build-arg NEXT_PUBLIC_API_BASE=/api
+          -f dao-bridge/org-web/Dockerfile .
+      - name: Build oracle
+        run: >
+          docker buildx build --load -t rodeo-oracle:ci
+          --cache-from type=gha,scope=oracle --cache-to type=gha,mode=max,scope=oracle
+          -f oracle/docker/Dockerfile .
+      - name: Build bridge
+        run: >
+          docker buildx build --load -t rodeo-bridge:ci
+          --cache-from type=gha,scope=bridge --cache-to type=gha,mode=max,scope=bridge
+          -f dao-bridge/ros2-eth-bridge/docker/Dockerfile dao-bridge/ros2-eth-bridge
+      - name: Build agent
+        run: >
+          docker buildx build --load -t rodeo-agent:ci
+          --cache-from type=gha,scope=agent --cache-to type=gha,mode=max,scope=agent
+          -f robot-agent/docker/Dockerfile .
+
+      - name: Oracle tests (in the oracle image)
+        run: |
+          docker run --rm --entrypoint bash -v "$PWD:/repo:ro" rodeo-oracle:ci -c '
+            source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash &&
+            cd /repo/oracle &&
+            python3 -m pytest -q -p no:pytest_ethereum -p no:cacheprovider tests'
+      - name: org-web backend compiles
+        run: python3 -m compileall -q dao-bridge/org-web/backend
+      - name: Stack files are valid
+        run: |
+          sed 's/__SHA__/0000000/g' deploy/portainer-stack.yml > /tmp/stack.yml
+          ORACLE_PRIVATE_KEY=x ORGANIZATION_WALLET_PRIVATE=x ORG_ADMIN_PIN=x \
+            docker compose -p rodeo -f /tmp/stack.yml config -q
+          sed -e 's/<42>/42/; s/<robot>/tiago/g; s/<tag>/ci/g; s/<0xROBOT_WALLET>/0x0000000000000000000000000000000000000001/g' \
+              -e 's#<path to RODEO>#/opt/rodeo#g; s/<dao.opsepolia.yaml>/dao.yaml/' \
+              deploy/robot-stack.example.yml > /tmp/robot.yml
+          docker compose -p robot -f /tmp/robot.yml config -q
+          bash -n deploy/ci-deploy.sh quick-start/e2e.sh
+
+      # A whole task on a fresh Ganache: posted through org-web, delivered by the fake
+      # executor, verified by the oracle, paid. Same script as `quick-start/e2e.sh` locally.
+      - name: End to end on Ganache
+        run: E2E_TAG=ci quick-start/e2e.sh
+
+  deploy:
+    name: Deploy to colossus
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    needs: checks
+    # The runner on colossus registered to this repo (the only place that can reach the stack).
+    runs-on: [self-hosted, colossus, rodeo]
+    concurrency:
+      group: deploy-rodeo
+      cancel-in-progress: false
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://rodeo.cyphy.life
+    steps:
+      - uses: actions/checkout@v5
+      - run: deploy/ci-deploy.sh
+        env:
+          ORG_WEB_PORT: ${{ vars.ORG_WEB_PORT || '8240' }}
+          PORTAINER_ENDPOINT_ID: ${{ vars.PORTAINER_ENDPOINT_ID || '2' }}

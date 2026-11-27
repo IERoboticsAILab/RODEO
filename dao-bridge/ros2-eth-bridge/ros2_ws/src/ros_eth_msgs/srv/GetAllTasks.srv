@@ -1,0 +1,3 @@
+---
+bool ok
+ros_eth_msgs/TaskInfo[] tasks

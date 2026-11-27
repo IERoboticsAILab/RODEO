@@ -1,0 +1,200 @@
+"""Oracle checks without a chain: synthetic proofs and the committed sample bags.
+
+    cd oracle && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+        PYTHONPATH=.:../robot-agent/ros2_ws/src/rodeo_common python -m pytest tests
+
+(web3 6 ships a pytest plugin that fails to import with newer eth-typing;
+disabling plugin autoload avoids it.)
+"""
+import json
+import os
+from types import SimpleNamespace as NS
+
+import pytest
+
+from rodeo_common.service_description import encode_service_description
+from rodeo_common.services_config import load_robot_config
+
+from oracle_node.checks import check_rodeo_proof
+from oracle_node.proofs import Event, RodeoProof
+from oracle_node.validators import validator_for
+from oracle_node.validators.waste_ros1 import validate_bag
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CFG = load_robot_config(os.path.join(HERE, "..", "..", "robot-agent", "config", "panther", "services.yaml"))
+DESC = encode_service_description(CFG, CFG.services[0])
+WALLET = CFG.wallet
+PICK, DROP = CFG.places["package_pickup"].xy, CFG.places["package_dropoff"].xy
+PARAMS = {"dropoff": "package_dropoff", "pickup": "package_pickup", "recipient": "the recipient", "sender": "RODEO"}
+T0 = 1_000_000.0
+
+
+def task(**kw):
+    d = dict(id=7, description="Package delivery", category="Logistics", task_type="ItemTransport",
+             executor=WALLET)
+    d.update(kw)
+    return NS(**d)
+
+
+def proof(params=PARAMS, task_id=7, drop_xy=DROP, unload=True, load_kg=1.2):
+    p = RodeoProof()
+    p.manifests.append(NS(format_version=1, task_id=task_id, executor=WALLET, robot="panther",
+                          category="Logistics", task_type="ItemTransport", params_json=json.dumps(params)))
+    seq = [  # (t, kind, data)
+        (1, "w", 0.0), (2, "pose", PICK), (2, "ev", ("arrive", "package_pickup", "")),
+        (3, "w", 0.0), (4, "w", load_kg), (5, "ev", ("depart", "package_pickup", "")),
+        (9, "pose", drop_xy), (9, "ev", ("arrive", params.get("dropoff", ""), "")),
+        (10, "w", load_kg), (11, "w", 0.0 if unload else load_kg)]
+    for dt, kind, data in seq:
+        t = T0 + dt
+        p.log_times.append(t)
+        if kind == "w":
+            p.weights.append((t, data, True))
+        elif kind == "pose":
+            p.poses.append((t, data[0], data[1]))
+        else:
+            p.events.append(Event(t, data[0], data[1], "", data[2]))
+    return p
+
+
+def run(t, p, window=(T0, T0 + 20), clock_check="duration"):
+    v = check_rodeo_proof(t, p, window, DESC, sha_ok=True, reused_by=None, tolerance_s=5,
+                          clock_check=clock_check)
+    if v.ok:
+        sub = validator_for(t.category, t.task_type)(NS(task=t, proof=p, service_desc=DESC, settings=None))
+        v.lines += sub.lines
+        v.ok, v.reason = sub.ok, sub.reason
+    return v
+
+
+def test_good_delivery_passes():
+    v = run(task(), proof())
+    assert v.ok, v.lines
+
+
+@pytest.mark.parametrize("t_kw,p_kw,reason", [
+    ({}, {"task_id": 8}, "proof is for task 8, not 7"),
+    ({"executor": "0x" + "1" * 40}, {}, "proof executor is not the task's executor"),
+    ({}, {"params": dict(PARAMS, dropoff="samuel_desk")}, "proof parameters do not match the task"),
+    ({}, {"drop_xy": (DROP[0] + 5, DROP[1])}, "robot was not at the drop-off place"),
+    ({}, {"unload": False}, "package was not unloaded at the drop-off place"),
+    ({}, {"load_kg": 0.0}, "no package was loaded at the pick-up place"),
+])
+def test_bad_deliveries_rejected(t_kw, p_kw, reason):
+    v = run(task(**t_kw), proof(**p_kw))
+    assert not v.ok and v.reason == reason, v.lines
+
+
+def test_time_window_and_hash_and_reuse():
+    t, p = task(), proof()                                 # proof recorded T0+1 .. T0+12 (11 s)
+    absolute = dict(clock_check="absolute")
+    assert run(t, p, (T0 + 10, T0 + 20), **absolute).reason == "proof recorded outside the task's time window"   # starts 9 s early
+    assert run(t, p, (T0, T0 + 5), **absolute).reason == "proof recorded outside the task's time window"         # ends 7 s late
+    assert run(t, p, (T0 + 4, T0 + 8), **absolute).ok                                                               # within 5 s
+    # default (duration): the recording clock may be off by any amount
+    assert run(t, p, window=(T0 + 3600, T0 + 3620)).ok                                     # clock 1 h behind
+    assert run(t, p, window=(T0 - 7200, T0 - 7190)).ok                                     # 2 h ahead, 10 s window
+    assert run(t, p, window=(T0, T0 + 1)).reason == "proof spans longer than the task was assigned"  # > 1 + 5 s
+    v = check_rodeo_proof(t, p, (T0, T0 + 20), DESC, sha_ok=False, reused_by=None, tolerance_s=5)
+    assert v.reason == "proof changed after submission (hash mismatch)"
+    v = check_rodeo_proof(t, p, (T0, T0 + 20), DESC, sha_ok=True, reused_by=3, tolerance_s=5)
+    assert v.reason == "proof reused from another task"
+
+
+def test_declared_weight():
+    # default DELIVERY_DECLARED_TOL_FRAC=0.5: a declared 1 kg passes for 0.5-1.5 kg
+    d = json.dumps({"v": 1, "params": {"declared_weight_kg": 1.0}, "note": ""})
+    params = dict(PARAMS, declared_weight_kg=1.0)
+    for kg in (0.5, 1.0, 1.2, 1.5):
+        assert run(task(description=d), proof(params=params, load_kg=kg)).ok, kg
+    for kg in (0.45, 1.55):
+        v = run(task(description=d), proof(params=params, load_kg=kg))
+        assert not v.ok and v.reason == "package weight differs from the declared weight", kg
+    d3 = json.dumps({"v": 1, "params": {"declared_weight_kg": 3.0}, "note": ""})
+    params3 = dict(PARAMS, declared_weight_kg=3.0)
+    assert not run(task(description=d3), proof(params=params3)).ok        # carried 1.2 kg, declared 3.0
+
+
+def test_legacy_waste_bags():
+    good_bag = os.path.join(HERE, "..", "proofs", "task_tid10_20250910_145742.bag")
+    bad_bag = os.path.join(HERE, "..", "proofs", "task_tid1_20250904_164349.bag")
+    if not (os.path.exists(good_bag) and os.path.exists(bad_bag)):
+        pytest.skip("legacy sample bags (ROS 1) are not in the repo")
+    good = validate_bag(good_bag)
+    assert good.ok and any("total 10.956 m" in l for l in good.lines)
+    bad = validate_bag(bad_bag)
+    assert not bad.ok and bad.reason == "Disposal event missing or incorrect"
+
+
+# ------------------------------------------------------------------ charging
+from oracle_node.validators.charging import SESSION_END, SESSION_START, delivered_wh  # noqa: E402
+
+STATION_DESC = json.dumps({"v": 1, "robot": "station", "summary": "", "settings": {"min_wh": 0.3},
+                           "params": {"robot": {"type": "text", "label": "Robot", "optional": False},
+                                      "wallet": {"type": "text", "label": "Robot wallet", "optional": False}}})
+ROBOT = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+
+
+def charge_proof(actor=ROBOT, seconds=10, amps=4.0, volts=38.0):
+    p = RodeoProof()
+    p.events.append(Event(T0, "note", "", SESSION_START, actor))
+    for k in range(int(seconds * 2) + 1):
+        p.charge.append((T0 + k / 2, volts, amps if k else 0.0, "cc" if k else "ramp_up"))
+    p.events.append(Event(T0 + seconds + 0.5, "note", "", SESSION_END, actor))
+    return p
+
+
+def run_charge(p, creator=ROBOT):
+    t = NS(id=9, category="Energy", task_type="Charging", executor="0x" + "9" * 40, creator=creator)
+    return validator_for("Energy", "Charging")(NS(task=t, proof=p, service_desc=STATION_DESC, settings=None))
+
+
+def test_energy_integral():
+    # 38 V x 4 A for 10 s (after a 0.5 s ramp) = 0.4167 Wh minus half a step of ramp
+    wh = delivered_wh([(0, 38.0, 0.0, "ramp_up"), (0.5, 38.0, 4.0, "cc"), (10.5, 38.0, 4.0, "cc")])
+    assert abs(wh - (38 * 4 * 10 + 38 * 4 * 0.25) / 3600) < 1e-9
+
+
+def test_charging_good_and_bad():
+    assert run_charge(charge_proof()).ok
+    assert run_charge(charge_proof(actor="0x" + "1" * 40)).reason == "charged robot is not the one that paid"
+    assert run_charge(charge_proof(), creator="0x" + "2" * 40).reason == "charged robot is not the one that paid"
+    assert run_charge(charge_proof(seconds=4)).reason.startswith("too little energy delivered")
+    p = charge_proof(); p.events = p.events[:1]
+    assert run_charge(p).reason == "no complete charging session in the proof"
+
+
+# ------------------------------------------------------------------ expiry sweeper
+from web3.exceptions import ContractLogicError  # noqa: E402
+
+from oracle_node.chain import ChainClient  # noqa: E402
+from oracle_node.expiry import run_expiry_sweeper  # noqa: E402
+
+
+def _sweeper_chain(is_expired):
+    """A ChainClient without web3: one assigned, active task; isExpired as given."""
+    call = lambda v: NS(call=lambda *a, **k: v() if callable(v) else v)  # noqa: E731
+    task = (1, "", "Logistics", "ItemTransport", b"", b"", "0x0", 0, 1, "0x0", True, "", "0x0", False)
+    chain = ChainClient.__new__(ChainClient)
+    chain.sent = []
+    chain.tm = NS(functions=NS(getAllTasks=lambda: call([task]),
+                               isExpired=lambda tid: call(is_expired),
+                               deadlineOf=lambda tid: call(123),
+                               expireTask=lambda tid: ("expire", tid)))
+    chain.send_tx = chain.sent.append
+    return chain
+
+
+def test_expiry_sweeper_off_when_contract_has_no_isExpired():
+    def revert():
+        raise ContractLogicError("execution reverted")
+    logs = []
+    run_expiry_sweeper(_sweeper_chain(revert), 0.01, log=logs.append)   # returns: sweeper off
+    assert logs[-1] == "task expiry: the deployed TaskManager has no execution timeouts - sweeper off"
+    assert not any("check failed" in line for line in logs)
+
+
+def test_expiry_sweeper_expires_overdue_task():
+    chain = _sweeper_chain(True)
+    assert chain.expire_overdue() == [(1, 123)]
+    assert chain.sent == [("expire", 1)]

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Local chain data (Ganache writes here; never commit it)
+blockchain-network/ganache-docker/ganache_db/
+blockchain-network/ganache-docker/docker-compose.override.yml
+
+# colcon
+build/
+install/
+log/
+
+# per-machine config copied from .env.example
+dao-bridge/ros2-eth-bridge/docker/.env
+oracle/docker/.env
+
+# proofs written by executors (task<id>_<robot>_<time>/)
+oracle/proofs/task[0-9]*_*/
+
+# oracle state (hashes of used proofs)
+oracle/state/
+
+# org-web admin PIN (see dao-bridge/org-web/.env.admin.example)
+dao-bridge/org-web/.env.admin
+
+# Settings for IE Coin on OP Sepolia hold real keys (copies of the .example files)
+oracle/docker/.env.opsepolia
+dao-bridge/org-web/.env.opsepolia
+dao-bridge/org-web/state/

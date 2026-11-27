@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, ListChecks, Wrench, CheckCircle2 } from "lucide-react";
+import WalletButton from "./WalletButton";
 
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/guide" className="btn btn-ghost focus-ring">Guide</Link>
           </nav>
           <div className="flex items-center gap-2">
+            {mounted && <WalletButton />}
             {mounted && (
               <button
                 className="btn focus-ring"

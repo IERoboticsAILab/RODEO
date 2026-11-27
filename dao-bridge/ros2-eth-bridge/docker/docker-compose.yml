@@ -1,0 +1,29 @@
+# ROS 2 Humble version of the RODEO ROS-Ethereum bridge (one wallet per instance).
+name: rodeo-ros2-bridge
+
+services:
+  ros2-eth-bridge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rodeo-ros2-bridge
+    container_name: ros2-eth-bridge
+    network_mode: host
+    ipc: host            # lets ROS 2 shared-memory transport work between containers
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-40}
+      - ROBOT_NAMESPACE=${ROBOT_NAMESPACE:-}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}   # rmw_cyclonedds_cpp next to a Panther web app
+      - OWN_ASSIGNMENTS_ONLY=${OWN_ASSIGNMENTS_ONLY:-true}
+      - ETH_WALLET_PASSPHRASE=${ETH_WALLET_PASSPHRASE:-}
+      # optional: another wallet than dao.yaml's (one bridge per wallet)
+      - ETH_WALLET_ADDRESS=${ETH_WALLET_ADDRESS:-}
+      - ETH_WALLET_KEYSTORE=${ETH_WALLET_KEYSTORE:-}
+      - ROS_ETH_DAO_YAML=/config/dao.yaml
+      - ETH_POLL_INTERVAL_SEC=${ETH_POLL_INTERVAL_SEC:-}   # event polling (default 1 s; OP Sepolia public RPC: 5)
+    volumes:
+      # DAO_CONFIG=dao.opsepolia.yaml: IE Coin on OP Sepolia (with its own WALLET_PATH)
+      - ./configs/${DAO_CONFIG:-dao.yaml}:/config/dao.yaml:ro
+      # keystore must exist on the host before the first start
+      - ${WALLET_PATH:-~/.ros_eth/wallet.json}:/root/.ros_eth/wallet.json:ro
+    restart: unless-stopped

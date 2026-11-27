@@ -53,12 +53,18 @@ robotic_decentralized_organization/
 │   └── ganache-docker/        # Local Ethereum blockchain (Ganache)
 │
 ├── dao-bridge/                # ROS-Blockchain integration layer
-│   ├── ros-eth-bridge/        # Bidirectional ROS-Ethereum communication
+│   ├── ros2-eth-bridge/       # Bidirectional ROS 2 - Ethereum communication
 │   └── org-web/               # Web console for DAO management
+│
+├── robot-agent/               # RODEO robot standard and the robot agent
 │
 ├── oracle/                    # Task verification oracle
 │
-└── quick-start/               # Demo scripts and tutorials
+├── quick-start/               # Demo without a robot: agent + fake executor; e2e.sh (whole task on Ganache)
+│
+├── deploy/                    # Server deploy (CI/CD): shared stack (org-web + oracle), robot stack template
+│
+└── scripts/                   # update-addresses.sh
 ```
 
 ## Quick Start Guide
@@ -88,6 +94,9 @@ curl -X POST http://localhost:8545 \
 
 **Expected output**: `{"jsonrpc":"2.0","id":1,"result":"0x0"}`
 
+The chain is stored in `blockchain-network/ganache-docker/ganache_db/` (not
+committed). To start again from an empty chain: `docker compose down && sudo rm -rf ganache_db`.
+
 ### Step 2: Deploy Smart Contracts
 
 Deploy the RODEO smart contracts to the local blockchain using Docker:
@@ -105,12 +114,13 @@ To force a rebuild of the deployer image (e.g. after contract changes):
 
 **Important**: After deployment completes, note the contract addresses displayed in the output. You will need to update these addresses in all components.
 
-**Sample output**:
+**Expected output** on a fresh chain (the addresses are deterministic, and are
+the ones already in the committed configs):
 ```
-IECoin deployed to: 0x3Aa5ebB10DC797CAC828524e59A333d0A371443c
-Organization deployed to: 0x093e8F4d8f267d2CeEc9eB889E2054710d187beD
-ServiceManager deployed to: 0xBa3e08b4753E68952031102518379ED2fDADcA30
-TaskManager deployed to: 0xa85b028984bC54A2a3D844B070544F59dDDf89DE
+IECoin:          0x5FbDB2315678afecb367f032d93F642f64180aa3
+Organization:    0x8464135c8F25Da09e49BC8782676a84730C318bC
+ServiceManager:  0x71C95911E9a5D330f4D621842EC243EE1343292e
+TaskManager:     0x712516e61C8B383dF4A63CFe83d7701Bce54B03e
 ```
 
 The deployment addresses are automatically saved to `deployments/1337.json`.
@@ -134,6 +144,7 @@ Or see [DEPLOYMENT-CONFIG.md](DEPLOYMENT-CONFIG.md) for manual update instructio
 
 ```bash
 cd oracle/docker
+cp -n .env.example .env   # first time only: .env is local (not in git)
 nano .env
 ```
 
@@ -165,7 +176,7 @@ IECOIN_ADDRESS=0x...
 #### 3.3 Update ROS-Ethereum Bridge Configuration
 
 ```bash
-cd ros-eth-bridge/docker/configs
+cd dao-bridge/ros2-eth-bridge/docker/configs
 nano dao.yaml
 ```
 
@@ -178,15 +189,17 @@ contracts:
   service_manager: "0x..."
 ```
 
-**Reference**: See [dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md](dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md) for details.
+**Reference**: See [dao-bridge/ros2-eth-bridge/README.md](dao-bridge/ros2-eth-bridge/README.md) for details.
 
 ### Step 4: Start Oracle Node
 
-The oracle validates task completion proofs:
+The oracle validates task completion proofs. It runs as ROS 2 nodes (the oracle
+plus one validator node per service type); a pure-Python oracle with the same
+checks is also available (`--profile python`, see [oracle/README.md](oracle/README.md)):
 
 ```bash
 cd oracle/docker
-docker compose up -d
+docker compose up -d --build
 
 # Verify oracle is running
 docker logs rodeo-oracle --tail 20
@@ -194,7 +207,9 @@ docker logs rodeo-oracle --tail 20
 
 **Expected output**:
 ```
+[delivery_validator]: delivery validator ready (Logistics/ItemTransport)
 ✅ Oracle configuration loaded from environment variables
+[oracle]: validator Logistics/ItemTransport -> /oracle/validate/delivery
 Starting event watcher from block 0 (current: X)
 Watching oracle requests and outcomes
 ```
@@ -203,24 +218,28 @@ Watching oracle requests and outcomes
 
 ### Step 5: Start ROS-Ethereum Bridge
 
-The bridge enables bidirectional communication between ROS and Ethereum:
+The bridge (ROS 2 Humble) enables bidirectional communication between ROS and Ethereum.
+It signs with the robot's keystore, which you create once:
 
 ```bash
-cd dao-bridge/ros-eth-bridge/docker
-docker compose up -d
+cd dao-bridge/ros2-eth-bridge
+pip3 install eth-account
+python3 scripts/make_wallet.py        # press Enter for an empty dev passphrase
+
+cd docker
+docker compose up -d --build
 
 # Verify bridge is running
-docker logs ros-eth-bridge --tail 30
+docker logs ros2-eth-bridge --tail 30
 ```
 
 **Expected output**:
 ```
-[INFO] dao_listener ready — chain 1337
-[INFO] dao_writer ready — chain 1337 sender 0x...
-[INFO] dao_writer running
+[dao_listener]: dao_listener ready - chain 1337 ... assignments for 0x15d34AAf... only
+[dao_writer]: dao_writer ready - chain 1337  sender 0x15d34AAf...
 ```
 
-**Reference**: [dao-bridge/ros-eth-bridge/docker/README.md](dao-bridge/ros-eth-bridge/docker/README.md)
+**Reference**: [dao-bridge/ros2-eth-bridge/README.md](dao-bridge/ros2-eth-bridge/README.md)
 
 ### Step 6: Start Web Console
 
@@ -231,7 +250,7 @@ cd dao-bridge/org-web
 docker compose up -d
 
 # Verify web console is running
-docker logs rodeo-org-web --tail 20
+docker logs org-web-console --tail 20
 ```
 
 Access the console at: **http://localhost:8080**
@@ -246,86 +265,61 @@ Connected: True
 
 ### Step 7: Run Integration Demo
 
-Execute the full workflow demonstration using Docker:
+Run a robot's RODEO software without a robot: the agent plus a fake executor
+that stands in for the robot (see [quick-start/README.md](quick-start/README.md)):
 
 ```bash
 cd quick-start/docker
 
-# First time (or after modifying the script):
-./robot-emulator.sh build
+# First time (or after code changes):
+./demo.sh build
 
-# Start the emulator:
-./robot-emulator.sh start
+# Start the agent and the fake executor:
+./demo.sh start
 
 # Follow the logs:
-./robot-emulator.sh logs
+./demo.sh logs
 ```
 
-On subsequent runs (service already registered on-chain), skip registration:
-
-```bash
-# Edit docker-compose.yml and uncomment the --skip-registration command override,
-# or stop the container and run with the flag directly:
-docker run --rm --network host \
-  -v $(pwd)/../oracle/proofs:/root/oracle/proofs:ro \
-  robot-emulator-demo \
-  python3 /root/robot_emulator_ws/robot_emulator_demo.py --skip-registration
-```
+Both use the bridge's `ROS_DOMAIN_ID` (default 40) and namespace (default none).
 
 **The demo will**:
-1. Register a delivery service on the blockchain (check the web UI and you will see a new service being created)
-2. Use the organizaation web console to create a new task!
+1. Register the Panther's Delivery service on the blockchain (check the web UI and you will see the new service).
+2. Use the organization web console to create a new task!
 
-   2.1 Navigate to the Tasks tab and create a new task with the following info:
-   - Title: Package delivery
-   - Description: Package delivery
-   - Category: Logistics
-   - Task Type: ItemTransport
-   - Reward: 100
-     
-   2.2 After creating the task on the web console you will notice that the task has been assigned to the robot wallet 
-4. On the robot emulator terminal you will notice that the robot recives the task assigment and starts the task execution.
-5. After task completition the robot submit a rosbag proof of completion
-6. On the oracle terminal you can notice that new proof has been recived and is being validated. This can take some time since the oracle is replaying the rosbag and validating different steps. In the end you will see a screen that says:
+   2.1 Connect MetaMask (top right; on the local chain, **Get test funds** gives a new wallet IEC and gas), or unlock the admin on the Home page with the PIN from `dao-bridge/org-web/.env.admin` to post as the organization. Then navigate to the Tasks tab, give the task a Name, choose Category **Logistics** and Type **ItemTransport (Delivery)** (only services that are online are listed; the price fills in), choose the pick-up and drop-off places under **Delivery details**, and click **Create task**. When the organization pays and its task funds run low, deposit more on the Home page (**Organization (admin)**).
+
+   2.2 After creating the task you will notice that it has been assigned to the robot wallet.
+3. In the demo logs the agent receives the assignment and the fake executor performs the delivery: pick-up, load, drop-off, unload.
+4. The agent hashes the proof and submits it.
+5. On the oracle terminal you can see the new proof being validated: first the checks every proof must pass (hash, reuse, manifest, parameters, time window), then the delivery validator. In the end you will see:
 ```
-rodeo-oracle  | Validation summary
-rodeo-oracle  |   Base path: OK  total 10.956 m, min 0.100 m
-rodeo-oracle  |   Arm: OK  net delta 13.4467 rad, tol 0.0500 rad, moves 952
-rodeo-oracle  |   Arm top joints by change: shoulder:3.069, wrist_rotate:3.037, forearm_roll:3.036
-rodeo-oracle  |   Disposal event: OK  correct flag seen True
+rodeo-oracle  | task 1 validation summary
+rodeo-oracle  |   OK    proof hash matches the URI
+rodeo-oracle  |   OK    proof not used before
+rodeo-oracle  |   OK    manifest task id 1
+rodeo-oracle  |   OK    parameters match the task
+rodeo-oracle  |   OK    recorded +1.2 s .. +0.2 s relative to assignment/submission (tolerance 5 s)
+rodeo-oracle  |   OK    pose at pick-up arrival 0.00 m from 'package_pickup' (max 1.00 m)
+rodeo-oracle  |   OK    package loaded at pick-up: 1.200 kg (min 0.05)
+rodeo-oracle  |   OK    deck empty after drop-off: 0.000 kg
 rodeo-oracle  | APPROVED
-rodeo-oracle  |
-rodeo-oracle  | ----- validator output end -----
-rodeo-oracle  |
 rodeo-oracle  | Approved task 1
-rodeo-oracle  |
 rodeo-oracle  | Task 1 verified
 ```
-7. Next check the web console, in the home tab you can see that the payment is released to the robot.
+6. Next check the web console: in the home tab you can see that the payment is released to the robot.
+7. Post a second task: the simulated battery then drops below 30 %, and the robot pays the institution's charging station 20 IEC for a charge, verified by the oracle like any other task (see [quick-start/README.md](quick-start/README.md); the station's keystore is created once with `make_wallet.py`).
 
-**Expected output**:
+**Expected output** (abridged):
 ```
-==============================================================
-RODEO Robot Emulator - Full Integration Demo
-==============================================================
-✅ Action servers connected!
-
-📝 Step 1: Registering delivery service...
-✅ Service registered successfully!
-
-🎯 Step 2: TASK ASSIGNED!
-   Task ID: 1
-   Reward: 100.0 IEC
-
-🤖 Step 3: Executing task...
-✅ Task execution completed!
-
-📤 Step 4: Submitting proof of completion...
-✅ Proof submitted successfully!
-
-⏳ Step 5: Waiting for oracle validation...
-✅ Task verified by oracle!
-💰 Payment received!
+rodeo-demo-agent     | register service 'Delivery' (Logistics/ItemTransport, 100 IEC): ok (block 13)
+rodeo-demo-agent     | ready - waiting for assignments
+rodeo-demo-agent     | task 1 assigned (reward 100 IEC)
+rodeo-demo-agent     | task 1: executing Delivery with {"dropoff": "package_dropoff", "pickup": "package_pickup", ...}
+rodeo-demo-executor  | task 1: to_pickup - package_pickup
+rodeo-demo-executor  | task 1: waiting_unload - the recipient takes the package
+rodeo-demo-agent     | task 1: submit proof: ok (block 15)
+rodeo-demo-agent     | task 1: VERIFIED - reward paid
 ```
 
 Monitor the oracle logs to see the validation process:
@@ -333,6 +327,75 @@ Monitor the oracle logs to see the validation process:
 ```bash
 docker logs -f rodeo-oracle
 ```
+
+### Everything in one command
+
+`quick-start/e2e.sh` does steps 1–7 on its own, on a fresh Ganache, isolated from
+anything else running. It posts a Delivery task through org-web, has the fake executor
+deliver it, and passes when the oracle has verified it and the robot is paid. CI runs it
+on every push.
+
+```bash
+quick-start/e2e.sh
+```
+
+### Step 8 (optional): a real robot instead of the fake executor
+
+A real robot replaces the fake executor with its own executor: something that
+serves `rodeo/execute_task` (`rodeo_interfaces/action/ExecuteTask`) in the
+robot's namespace and writes the proof with `rodeo_agent.proof_writer.ProofWriter`.
+The Panther's executor lives in its web app (IERoboticsAILab/robopreneur, branch
+`panther-webapp`, `README_rodeo_executor.md`). To add your own robot, follow
+[robot-agent/README.md, "Adding a robot"](robot-agent/README.md#8-adding-a-robot). It has delivered org-web tasks in a Gazebo twin and
+on the real Panther, verified by the oracle and paid.
+
+The robot's bridge, its agent and its executor must share:
+- **`ROS_DOMAIN_ID`**: the executor's domain, e.g. 42 for the Gazebo twin, 41 for
+  the Panther's web app;
+- **`ROBOT_NAMESPACE`**: `panther`;
+- **`RMW_IMPLEMENTATION`**: `rmw_cyclonedds_cpp` next to the Panther web app. The
+  images include CycloneDDS; the default stays Fast DDS.
+
+The proof folder must be the same for all of them: `oracle/proofs`, mounted at
+`/root/oracle/proofs`.
+
+```bash
+cd quick-start/docker && docker compose stop fake-executor
+cd ../../dao-bridge/ros2-eth-bridge/docker
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --force-recreate
+cd ../../../quick-start/docker
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --no-deps --force-recreate agent
+```
+
+Start the bridge before the agent; the agent gives up after 60 s without one.
+The oracle and the charging station stay on their own domain, since they only
+talk through the chain.
+
+## Logs
+
+Every component runs in a container, and `docker logs` shows what it is doing:
+
+```bash
+docker logs -f <container>                 # follow live (Ctrl-C to stop)
+docker logs --tail 50 <container>          # last 50 lines
+docker logs --since 10m <container>        # last 10 minutes
+docker logs <container> 2>&1 | grep -i error
+docker compose logs -f <service>           # the same, from the compose folder, by service name
+```
+
+| Container | Started from | What to look for |
+|---|---|---|
+| `ganache` | `blockchain-network/ganache-docker` | blocks and transactions |
+| `smart-contract-deployer` | `blockchain-network/smart-contracts/docker` | the deployed addresses |
+| `rodeo-oracle` | `oracle/docker` | one validation summary per task, then APPROVED/REJECTED |
+| `ros2-eth-bridge` | `dao-bridge/ros2-eth-bridge/docker` | `dao_listener ready`, `dao_writer ready`; a Traceback with "MAC mismatch" = wrong wallet passphrase |
+| `org-web-console` | `dao-bridge/org-web` | the backend's config and chain connection |
+| `rodeo-demo-agent` | `quick-start/docker` | service registered, "ready", task assigned, stages, submit proof, VERIFIED/REJECTED |
+| `rodeo-demo-executor` | `quick-start/docker` | the fake executor's stages |
+| `rodeo-demo-station-bridge`, `-agent`, `-executor` | `quick-start/docker` | the charging station |
+| `rodeo-agent` | `robot-agent/docker` | a single robot's agent (outside the demo) |
+
+`./demo.sh logs` in `quick-start/docker` follows the whole demo.
 
 ## System Requirements
 

@@ -86,7 +86,7 @@ else
 fi
 
 # Update ROS-ETH Bridge dao.yaml
-BRIDGE_YAML="$REPO_ROOT/dao-bridge/ros-eth-bridge/docker/configs/dao.yaml"
+for BRIDGE_YAML in "$REPO_ROOT/dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml"; do
 if [ -f "$BRIDGE_YAML" ]; then
     echo -e "${YELLOW}Updating ROS-ETH Bridge configuration...${NC}"
     # Only match contract addresses (starting with 0x), not abi_paths (starting with /)
@@ -96,8 +96,9 @@ if [ -f "$BRIDGE_YAML" ]; then
     sed -i "s|iecoin: \"0x.*\"|iecoin: \"$IEC_ADDR\"|" "$BRIDGE_YAML"
     echo -e "  ${GREEN}✓${NC} $BRIDGE_YAML"
 else
-    echo -e "  ${YELLOW}⚠${NC} ROS-ETH Bridge dao.yaml not found, skipping"
+    echo -e "  ${YELLOW}⚠${NC} $BRIDGE_YAML not found, skipping"
 fi
+done
 
 echo ""
 echo -e "${GREEN}=====================================${NC}"
@@ -108,10 +109,10 @@ echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Restart all Docker containers to apply changes:"
 echo "   cd oracle/docker && docker compose restart"
 echo "   cd ../../dao-bridge/org-web && docker compose restart"
-echo "   cd ../ros-eth-bridge/docker && docker compose restart"
+echo "   cd ../ros2-eth-bridge/docker && docker compose restart"
 echo ""
 echo "2. Verify configurations:"
 echo "   docker logs rodeo-oracle | grep -i address"
-echo "   docker logs rodeo-org-web | grep -i address"
-echo "   docker logs ros-eth-bridge | grep -i chain"
+echo "   docker logs org-web-console | grep -i address"
+echo "   docker logs ros2-eth-bridge | grep -i ready"
 echo ""

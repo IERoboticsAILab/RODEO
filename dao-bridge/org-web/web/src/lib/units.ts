@@ -35,3 +35,13 @@ export function formatUnitsString(
   const out = fracPart ? `${intPart}.${fracPart}` : intPart;
   return neg ? "-" + out : out;
 }
+// 900 -> "15 min", 90 -> "1 min 30 s", 3600 -> "1 h"
+export function formatDuration(sec: number): string {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const parts = [];
+  if (h) parts.push(`${h} h`);
+  if (m) parts.push(`${m} min`);
+  if (s || parts.length === 0) parts.push(`${s} s`);
+  return parts.join(" ");
+}

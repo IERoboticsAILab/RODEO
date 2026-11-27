@@ -170,34 +170,32 @@ IECOIN_ADDRESS=0x...
 ```
 
 **Update ABIs:**
-The ABIs in the oracle are defined in oracle/oracle_node/settings.py and they use the ABI from the ros-eth-bridge. 
-Place the new ABI is dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi.
-If you define new functions, make sure to edit the Oracle soruce code to use those functions.
+The oracle reads the ABIs from the ROS 2 bridge's `abi/` folder
+(`BASE_ABI`, mounted by `oracle/docker/docker-compose.yml`; default in
+`oracle/oracle_node/settings.py`), so updating the bridge's copies (below)
+updates the oracle too. If you define new functions, make sure to edit the
+Oracle source code to use those functions.
 
 ### 2. Update ROS-ETH Bridge
 
-The ROS bridge needs contract ABIs:
+The ROS 2 bridge keeps the contract ABIs in one folder, used both for colcon
+builds and for the Docker image:
 
 ```bash
-# Copy ABIs to ROS bridge
-cp artifacts/contracts/TaskManager.sol/TaskManager.json dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi
-cp artifacts/contracts/Organization.sol/Organization.json dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi
-cp artifacts/contracts/ServiceManager.sol/ServiceManager.json dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi
-cp artifacts/contracts/IECoin.sol/IECoin.json dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi
+# from blockchain-network/smart-contracts, after `npm run compile`
+ABI=../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi
+for c in TaskManager Organization ServiceManager IECoin; do
+  cp artifacts/contracts/$c.sol/$c.json $ABI/
+done
 ```
-For the docker image place them in:
-```bash
-# Copy ABIs to docker ROS bridge
-cp artifacts/contracts/TaskManager.sol/TaskManager.json dao-bridge/ros-eth-bridge/docker/catkin_ws/src/ros_eth_bridge/abi/
-cp artifacts/contracts/Organization.sol/Organization.json dao-bridge/ros-eth-bridge/docker/catkin_ws/src/ros_eth_bridge/abi/
-cp artifacts/contracts/ServiceManager.sol/ServiceManager.json dao-bridge/ros-eth-bridge/docker/catkin_ws/src/ros_eth_bridge/abi/
-cp artifacts/contracts/IECoin.sol/IECoin.json dao-bridge/ros-eth-bridge/docker/catkin_ws/src/ros_eth_bridge/abi/
-```
-Make sure to edit the source code of ros-eth-bridge to use the new functions
+
+Then rebuild the bridge image (`docker compose up -d --build` in
+`dao-bridge/ros2-eth-bridge/docker`). If you add or change functions, update
+the bridge's `eth/dao/` layer to use them.
 
 **Update addresses in bridge configuration:**
 ```bash
-cd ros-eth-bridge/docker/configs
+cd dao-bridge/ros2-eth-bridge/docker/configs
 nano dao.yaml
 ```
 
@@ -268,4 +266,4 @@ smart-contracts/
 
 ## License
 
-MIT License - See [LICENSE](../../LICENSE)
+MIT License - See [LICENSE](../../LICENSE.md)

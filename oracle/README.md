@@ -6,31 +6,103 @@ The Oracle Node is a trusted verification service that validates task completion
 
 The Oracle serves as an independent verification layer in the RODEO system:
 
-1. **Listens for Proof Submissions** - Monitors blockchain events when robots submit task completion proofs
-2. **Validates Proofs** - Analyzes proof data to verify task completion:
-   - **ROS bag files (.bag)**: Validates robot motion, arm movements, and disposal events
-   - **Power consumption logs (.csv)**: Calculates energy usage and converts to IECoin rewards
-3. **Makes Decisions** - Approves valid proofs or rejects invalid ones with specific reasons
-4. **Updates Blockchain** - Sends verification transactions to the TaskManager contract
-5. **Triggers Payments** - Approved tasks automatically release escrowed funds to robots
+1. **Listens for Proof Submissions** - Monitors `TaskOracleRequested` events when robots submit proofs
+2. **Validates Proofs** - Runs shared checks, then the validator registered for the task's service
+3. **Makes Decisions** - Approves valid proofs or rejects invalid ones with a specific reason
+4. **Updates Blockchain** - Sends `oracleFulfill` to the TaskManager contract
+5. **Triggers Payments** - Approved tasks release the escrowed reward to the robot
 
-### Current Validation Capabilities
+### Two implementations, one behaviour
 
-#### ROS Bag Validation
-The oracle analyzes robot behavior from ROS bag recordings:
-- **Base Movement**: Tracks odometry to verify robot traveled minimum distance
-- **Arm Manipulation**: Monitors joint states for arm activity
-- **Disposal Events**: Confirms task-specific events (e.g., waste disposal)
-- **Motion Analysis**: Detects movement vs. stopped states to prevent false proofs
+| | ROS 2 oracle (default) | Python oracle (alternative) |
+|---|---|---|
+| Where | `ros2_ws/src/rodeo_oracle`, compose service `oracle` | `oracle_node/`, compose service `oracle-python` (profile `python`) |
+| Validators | ROS 2 nodes serving `rodeo_interfaces/srv/ValidateProof`, in any language (C++ or Python), free to use any ROS library | Python functions registered in `oracle_node/validators/` |
+| Reads proofs with | `rosbag2` | `rosbags` (no ROS install) |
+| Verdicts | logged, and published as JSON on `/oracle/verdicts` | logged |
+| Console | none (runs unattended; see Interactive Mode) | `docker attach` menu |
 
-#### Power Consumption Validation
-For energy-based tasks:
-- Parses CSV power logs with timestamps and wattage
-- Calculates total energy consumption (kWh)
-- Converts energy to IECoin rewards based on configured rate
-- Awards tokens proportional to energy used
+Both share the chain client, the shared checks and the delivery rules
+(`oracle_node/`), so they give the same verdict for the same proof. Run one at
+a time: both sign as the same oracle wallet.
 
----
+The ROS 2 oracle runs three nodes in the `/oracle` namespace: `oracle` (chain,
+shared checks, verdicts), `delivery_validator` (serves
+`/oracle/validate/delivery`) and `charging_validator` (serves
+`/oracle/validate/charging`). The oracle's `validators` parameter maps a
+service kind to a validator service, e.g.
+`Logistics/ItemTransport=validate/delivery`. A RODEO proof for a kind with no
+validator, or whose validator node is not running, is rejected.
+
+### Checks on every RODEO proof
+
+A RODEO proof (a ROS 2 bag written by the robot's executor, see
+[../robot-agent/README.md](../robot-agent/README.md)) must pass these before its
+service's validator runs:
+
+| Check | Rejects |
+|---|---|
+| Hash | a file that no longer matches the `#sha256=` in its URI |
+| Reuse | a proof already used for another task (hashes are kept in `state/used_proofs.json`) |
+| Manifest | a proof for another task, executor, category or task type |
+| Parameters | a proof whose parameters differ from the task's (with the service's defaults filled in) |
+| Time window | a proof that spans longer than the task was assigned (assignment to submission, block times, `CLOCK_TOLERANCE_SEC`). Only durations are compared, so the robot's and servers' clocks need no sync. `CLOCK_CHECK=absolute` restores the old check (every message inside the window by the recording computer's clock) |
+
+### Execution time limits
+
+`Organization.setTaskTimeout(category, seconds)` gives a category a time limit
+from assignment. `deploy.js` sets Logistics to 900 s (`LOGISTICS_TIMEOUT_S`). The
+contract refuses a proof submitted after the deadline. A contract cannot act by
+itself, so every `EXPIRE_EVERY_SEC` (default 15; 0 = off) the oracle sends
+`TaskManager.expireTask` for assigned tasks past their deadline without a proof.
+The contract then unassigns the task, refunds the creator, frees the service and
+deactivates the task (Activate posts it again). The robot's agent sees
+`TaskUnassigned` and cancels the run. A proof submitted in time is still verified
+after the deadline. Only block times are compared.
+
+Contracts without these functions (the IE Coin contracts on OP Sepolia): the
+sweeper turns itself off and org-web keeps the limits instead
+(`dao-bridge/org-web/backend/task_timer.py`, `ORG_TASK_TIMEOUTS`).
+
+### Public chains (OP Sepolia)
+
+The oracle reads events with plain `eth_getLogs` over block ranges, never
+`eth_newFilter`: public, load-balanced RPCs lose filters between requests.
+`START_BLOCK` is the contracts' first block (OP Sepolia `51608886`); `LOG_CHUNK`
+(default 10000, the public RPC's limit) is the most blocks one query covers.
+`MIN_GAS_PRICE` defaults to 1 gwei for Ganache; on OP Sepolia use about 0.001 gwei
+(`1000000`), see `docker/.env.opsepolia.example`.
+
+### Validators
+
+Chosen by the task's category and task type. The rules live in
+`oracle_node/validators/`; in the ROS 2 oracle each runs inside a validator node:
+
+| Service | Validator | Checks |
+|---|---|---|
+| Energy / Charging | `charging.py` | a complete session (start and end) for the robot that posted and paid for the task; energy integrated from the station's voltage and current samples at least the service's `min_wh`; active charging seen |
+| Logistics / ItemTransport | `delivery.py` | arrived at the pick-up, then the drop-off place, within `DELIVERY_PLACE_RADIUS_M` of the places in the service's on-chain description; a package was loaded at pick-up, carried and unloaded at drop-off (deck weight, `DELIVERY_WEIGHT_TOL_KG`; within ±50 % of the declared weight if given, `DELIVERY_DECLARED_TOL_FRAC`). No recipient confirmation is needed |
+
+A new service gets a validator by:
+
+- **ROS 2 oracle:** a node (any language) serving `ValidateProof` under the
+  oracle's namespace, started from `launch/oracle.launch.py` and listed in the
+  `validators` parameter. `rodeo_oracle/delivery_validator.py` is the template.
+- **Python oracle:** a module with `@register("Category", "TaskType")`, imported
+  in `validators/__init__.py`.
+
+### Legacy proofs
+
+Proofs in the original formats are still accepted while `LEGACY_PROOFS=1` (the
+default):
+
+- **ROS 1 bag (.bag)**: the original waste-sorting checks (path length on
+  `/odom_mocap`, arm movement on `/vx300s/joint_states`, a correct
+  `/disposal_event`), ported to read the bag directly.
+- **Power log (.csv)**: energy is computed and the task approved, as before.
+
+They carry no manifest, so a legacy proof passes for **any** task. Set
+`LEGACY_PROOFS=0` to refuse them once nothing relies on them.
 
 ## Quick Start (Docker)
 
@@ -71,7 +143,7 @@ ORACLE_PRIVATE_KEY=0x...
 ./oracle-docker.sh start
 
 # View logs
-./oracle-docker.sh logs
+./oracle-docker.sh logs           # or: docker logs -f rodeo-oracle
 ```
 
 ### 3. Verify Running
@@ -130,22 +202,30 @@ rodeo-oracle  | [li] list inbox, [ok] approve, [no] reject, [va] validate, [q] q
 
 ### Proof Format
 
-**ROS Bag Files:**
+**RODEO proofs** (ROS 2 bag directory, MCAP storage):
 ```
-Proof URI: file:///path/to/task_tid1_20250904_164349.bag
+Proof URI: file:///root/oracle/proofs/task12_panther_20261110T142233#sha256=<hex>
+Topics:
+  - /rodeo/manifest        (rodeo_interfaces/ProofManifest)  task, executor, parameters
+  - /rodeo/pose            (geometry_msgs/PoseStamped)       map frame
+  - /rodeo/events          (rodeo_interfaces/TaskEvent)      arrive, depart, say, confirm
+  - /rodeo/payload_weight  (rodeo_interfaces/PayloadWeight)  delivery only
+```
+
+**Legacy ROS 1 bags:**
+```
+Proof URI: file:///root/oracle/proofs/task_tid10_20250910_145742.bag
 Topics:
   - /odom_mocap (nav_msgs/Odometry)
   - /vx300s/joint_states (sensor_msgs/JointState)
   - /disposal_event (std_msgs/String)
 ```
 
-note: In the proofs directory there are two  examplaary proofs rosbags from task 1 (task_tid1_20250904_164349.bag) and task 10 (task_tid10_20250910_145742.bag).
+The proofs directory holds two example legacy bags: `task_tid10_20250910_145742.bag`
+passes the waste-sorting checks, `task_tid1_20250904_164349.bag` fails them (no
+correct disposal event).
 
-❌ Task 1 is a failed task and will result in escrowed funds returend to creater.
-
-✅ Task 2 is sucsesfull task and will result in escrowed funds relested to robot.
-
-**Power CSV Files:**
+**Legacy power CSV files:**
 ```
 Proof URI: file:///path/to/power_log.csv
 Format:
@@ -159,11 +239,15 @@ timestamp,watts
 
 ## Interactive Mode
 
-Attach to running oracle for interactive control:
+The ROS 2 oracle runs unattended. For the menu (inbox, manual approve or
+reject, re-validate), start the Python console inside its container without a
+second chain watcher:
 
 ```bash
-docker attach rodeo-oracle
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 ```
+
+With the Python oracle, attach to it instead: `docker attach rodeo-oracle-python`.
 
 **Menu options:**
 ```
@@ -186,8 +270,8 @@ To detach without stopping: `Ctrl+P` then `Ctrl+Q`
 ### Manual Approval (if needed)
 
 ```bash
-# Attach to oracle
-docker attach rodeo-oracle
+# Open the console (ROS 2 oracle; with the Python oracle: docker attach rodeo-oracle-python)
+docker exec -it -e ORACLE_WATCH=0 rodeo-oracle python3 -m oracle_node.main
 
 # Select option 2 (Approve task)
 # Enter task ID when prompted
@@ -219,23 +303,24 @@ python -m oracle_node.main
 
 ```
 oracle/
-├── docker/                    # Docker deployment
-│   ├── Dockerfile             # Container definition
-│   ├── docker-compose.yml     # Orchestration
+├── docker/                    # Dockerfile (ROS 2, default), Dockerfile.python, one compose file
+│   ├── Dockerfile
+│   ├── docker-compose.yml
 │   ├── .env.example           # Configuration template
-│   ├── oracle-docker.sh       # Helper script
-│   ├── QUICKSTART.md          # Quick start guide
-│   └── README.md              # Docker documentation
-├── oracle_node/               # Oracle Python package
+│   └── oracle-docker.sh       # Helper script
+├── ros2_ws/src/rodeo_oracle/  # ROS 2 oracle: oracle node, delivery_validator node, launch
+├── oracle_node/               # Python oracle and the logic both oracles share
 │   ├── main.py                # Entry point
-│   ├── controller.py          # Validation logic
+│   ├── settings.py            # Configuration from the environment
+│   ├── chain.py               # Contract access, task time windows, service descriptions
 │   ├── events.py              # Event monitoring
-│   ├── task_manager.py        # Contract interaction
-│   └── validator/             # Validation modules
-├── proofs/                    # Proof file storage
-│   └── README.md              # Proof examples
-├── oracle_rosbag_validator.py # ROS bag validator
-├── power_logger.py            # Power monitoring utility
+│   ├── controller.py          # Routes each proof to its checks
+│   ├── proofs.py              # Reads proofs (rosbags)
+│   ├── checks.py              # Shared checks on RODEO proofs
+│   ├── power_csv.py           # Energy from power CSVs
+│   └── validators/            # delivery.py, waste_ros1.py, energy_csv.py
+├── proofs/                    # Proofs (examples committed; generated ones ignored)
+├── state/                     # Hashes of used proofs (created at run time, not committed)
 └── addresses.json             # Contract addresses (fallback)
 ```
 

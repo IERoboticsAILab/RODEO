@@ -1,0 +1,102 @@
+# RODEO on colossus (IE Coin on OP Sepolia): Portainer stack "rodeo", the lab's shared
+# marketplace side: org-web and the oracle. It needs no robot.
+#
+# Robots are separate stacks, one per robot, deployed from their own repo (the Panther:
+# IERoboticsAILab/robopreneur, branch panther-webapp, stack panther-webapp). Each holds
+# that robot's bridge (its own wallet), agent and executor, built from a pinned RODEO
+# release tag. Stopping a robot's stack takes only that robot off the marketplace.
+#
+# Deployed by deploy/ci-deploy.sh (the GitHub runner on colossus) after CI passes on
+# main; see deploy/DEPLOY.md. __SHA__ is replaced by the commit being deployed: the
+# image tags, and the release folder /opt/rodeo/releases/<sha> (a `git archive` of
+# that commit) that the read-only config mounts come from. Never use :latest.
+#
+# Secrets live in Portainer's "Environment variables" for this stack (never in git):
+#   ORACLE_PRIVATE_KEY           oracle 0xE384…Ac4e
+#   ORGANIZATION_WALLET_PRIVATE  operator / Organization owner 0xdB3E…0146
+#   ORG_ADMIN_PIN                org-web admin PIN
+# Everything else below has OP Sepolia defaults that the stack env may override.
+#
+# Only org-web is reachable, on 127.0.0.1:${ORG_WEB_PORT}, behind the host nginx
+# (deploy/nginx/rodeo.cyphy.life.conf). Proofs: robot stacks write them into
+# /opt/rodeo/proofs, the oracle reads them there (the robots' proof URIs are
+# file:///root/oracle/proofs/...).
+
+x-chain: &chain
+  RPC_URL: ${RPC_URL:-https://optimism-sepolia-rpc.publicnode.com}
+  ORGANIZATION_ADDRESS: ${ORGANIZATION_ADDRESS:-0xA0121b301f86e54d0E9Df8A5BDFF506C5815d426}
+  IECOIN_ADDRESS: ${IECOIN_ADDRESS:-0x0235a0145303B013561FD1E9658F8eD8BA5629Bd}
+
+services:
+  org-web:
+    image: rodeo-org-web:__SHA__
+    container_name: rodeo-org-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ORG_WEB_PORT:-8240}:80"
+    environment:
+      <<: *chain
+      ORGANIZATION_WALLET_PUBLIC: ${ORGANIZATION_WALLET_PUBLIC:-0xdB3E3A942dd824F228bA5151887Cc80C9B150146}
+      ORGANIZATION_WALLET_PRIVATE: ${ORGANIZATION_WALLET_PRIVATE:?set ORGANIZATION_WALLET_PRIVATE in the stack env}
+      ORG_ADMIN_PIN: ${ORG_ADMIN_PIN:?set ORG_ADMIN_PIN in the stack env}
+      WALLET_RPC_URL: ${WALLET_RPC_URL:-https://optimism-sepolia-rpc.publicnode.com}
+      WALLET_CHAIN_NAME: OP Sepolia
+      DEV_FAUCET: "0"
+      IECOIN_DEPLOY_BLOCK: ${START_BLOCK:-51608886}
+      ORG_START_BLOCK: ${START_BLOCK:-51608886}
+      ORG_TASK_TIMEOUTS: ${ORG_TASK_TIMEOUTS:-Logistics=900}
+      ORG_TIMER_EVERY_S: "10"
+      ORG_LOG_CHUNK: "2000"
+      ABI_ROOT: contracts
+      ADDRESSES_JSON: addresses.json
+      NEXT_PUBLIC_API_BASE: /api
+      CORS_ORIGINS: ""
+    volumes:
+      - /opt/rodeo/releases/__SHA__/dao-bridge/org-web/backend/contracts:/app/contracts:ro
+      - /opt/rodeo/state/org-web:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  oracle:
+    image: rodeo-oracle:__SHA__
+    container_name: rodeo-oracle
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    tty: true                     # unbuffered output, so `docker logs` shows the verdicts
+    environment:
+      <<: *chain
+      # ROS only between the oracle and its own validator nodes: domain 40, which no
+      # robot stack uses, and DDS on loopback only (lo has no multicast: unicast discovery).
+      ROS_DOMAIN_ID: "40"
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      CYCLONEDDS_URI: '<CycloneDDS><Domain Id="any"><General><Interfaces><NetworkInterface name="lo"/></Interfaces><AllowMulticast>false</AllowMulticast></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>100</MaxAutoParticipantIndex><Peers><Peer Address="127.0.0.1"/></Peers></Discovery></Domain></CycloneDDS>'
+      TASK_MANAGER_ADDRESS: ${TASK_MANAGER_ADDRESS:-0xddB7727600b2C3DD22737Bce371C6EdBC3184978}
+      SERVICE_MANAGER_ADDRESS: ${SERVICE_MANAGER_ADDRESS:-0x0C3CCc95c02b4768706F0a2Bb53333E7d64587CA}
+      ORACLE_ADDRESS: ${ORACLE_ADDRESS:-0xE38432ea907059d785954F17458722618B84Ac4e}
+      ORACLE_PRIVATE_KEY: ${ORACLE_PRIVATE_KEY:?set ORACLE_PRIVATE_KEY in the stack env}
+      ADDRESSES_JSON: /workspace/addresses.json
+      BASE_ABI: /workspace/abi
+      TASK_MANAGER_NAME: TaskManager
+      MIN_GAS_PRICE: "1000000"
+      GAS_MULTIPLIER: "1.2"
+      CLOCK_CHECK: duration
+      CLOCK_TOLERANCE_SEC: "5"
+      EXPIRE_EVERY_SEC: "15"
+      EVENT_POLL_SEC: "10"
+      START_BLOCK: ${START_BLOCK:-51608886}
+      LOG_CHUNK: "10000"
+      LEGACY_PROOFS: "1"
+      STATE_DIR: /workspace/state
+      POS_EPS: "0.002"
+      IEC_PER_KWH: "1.0"
+      IEC_DECIMALS: "18"
+    volumes:
+      - /opt/rodeo/releases/__SHA__/dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi:/workspace/abi:ro
+      - /opt/rodeo/proofs:/workspace/proofs:ro
+      - /opt/rodeo/proofs:/root/oracle/proofs:ro
+      - /opt/rodeo/state/oracle:/workspace/state

@@ -1,0 +1,4 @@
+string creator   # pass empty to use the wallet from dao.yaml
+---
+bool ok
+ros_eth_msgs/ServiceInfo[] services

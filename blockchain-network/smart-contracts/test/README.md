@@ -178,4 +178,4 @@ Each account starts with **10,000 ETH** on Hardhat network.
 ---
 
 ## License
-MIT License - See [LICENSE](../../../LICENSE)
+MIT License - See [LICENSE](../../../LICENSE.md)

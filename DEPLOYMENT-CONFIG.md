@@ -72,27 +72,28 @@ docker compose restart
 
 ## 4. Update ROS-Ethereum Bridge Configuration
 
-**Location**: `dao-bridge/ros-eth-bridge/docker/configs/dao.yaml`
+**Location**: `dao-bridge/ros2-eth-bridge/docker/configs/dao.yaml`
 
 ```bash
-cd dao-bridge/ros-eth-bridge/docker/configs
+cd dao-bridge/ros2-eth-bridge/docker/configs
 nano dao.yaml
 ```
 
 Update the `contracts` section:
 ```yaml
 contracts:
-  Organization: "0x..."
-  TaskManager: "0x..."
-  ServiceManager: "0x..."
-  IECoin: "0x..."
+  iecoin: "0x..."
+  organization: "0x..."
+  task_manager: "0x..."
+  service_manager: "0x..."
 ```
 
-Update wallet info if needed:
+The wallet section names the robot's address and keystore (created with
+`dao-bridge/ros2-eth-bridge/scripts/make_wallet.py`):
 ```yaml
 wallet:
-  address: "0x..."
-  keystore: "/root/.ros_eth_wallet/wallet.json"
+  keystore_path: ~/.ros_eth/wallet.json
+  address: "15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
 ```
 
 Restart:
@@ -101,57 +102,81 @@ cd ..
 docker compose restart
 ```
 
-**📖 Detailed guide**: [dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md](dao-bridge/ros-eth-bridge/docker/CONFIG-UPDATE.md)
+**📖 Detailed guide**: [dao-bridge/ros2-eth-bridge/README.md](dao-bridge/ros2-eth-bridge/README.md)
 
-## 5. Update Robot Demo Scripts (Optional)
+## 5. Robot scripts
 
-If you have robot scripts that directly interact with contracts:
+Robots never hold contract addresses themselves: they call the bridge's actions
+and services, and the bridge reads `dao.yaml`. The demo in
+`quick-start/` needs no update.
 
-**Locations**:
-- `quick-start/robot_emulator_demo.py`
-- `quick-start/demo.py`
-- Custom robot scripts
+## IE Coin on OP Sepolia
 
-These typically don't hardcode addresses, instead they:
-- Use ROS parameters (loaded from dao.yaml)
-- Call ROS action servers (which use the bridge configuration)
+The lab's IE Coin runs on **OP Sepolia** (chain id `11155420`, RPC
+`https://optimism-sepolia-rpc.publicnode.com`; `sepolia.optimism.io` rate-limits
+the whole stack per IP), explorer https://sepolia-optimism.etherscan.io,
+lab explorer https://iecoin.cyphy.life); see IERoboticsAILab/iecoin#1. Its
+Organization, ServiceManager and TaskManager are the code from before the
+on-chain time limits, so org-web keeps the limits (`task_timer.py`). The local
+Ganache settings stay the default; OP Sepolia is chosen per component:
 
-**No update needed** as long as the ROS-Ethereum bridge is configured correctly.
+| Component | OP Sepolia settings | Key |
+|---|---|---|
+| org-web | `dao-bridge/org-web/.env.opsepolia` (from `.env.opsepolia.example`) | operator (Organization owner) `0xdB3E…0146` |
+| oracle | `oracle/docker/.env.opsepolia` (from `.env.opsepolia.example`) | oracle `0xE384…Ac4e` |
+| bridge | `dao-bridge/ros2-eth-bridge/docker/configs/dao.opsepolia.yaml` | robot `0xf31e…917f`, keystore `~/.ros_eth/wallet_opsepolia.json` |
+
+The keys are in Bitwarden (CyPhy Life → Lab Infra, "RODEO Sepolia wallets +
+contracts"). The `.env.opsepolia` files are gitignored; never put these keys in a
+tracked file.
+
+Once:
+
+```bash
+cd ~/rodeo-ros2
+# robot keystore (Enter = empty passphrase); the key is read without echo
+read -rs -p "robot private key: " ROBOT_PRIVATE_KEY; echo; export ROBOT_PRIVATE_KEY
+python3 dao-bridge/ros2-eth-bridge/scripts/make_wallet.py --out ~/.ros_eth/wallet_opsepolia.json
+unset ROBOT_PRIVATE_KEY
+cp dao-bridge/org-web/.env.opsepolia.example dao-bridge/org-web/.env.opsepolia   # add the operator key
+cp oracle/docker/.env.opsepolia.example oracle/docker/.env.opsepolia             # add the oracle key
+```
+
+Start (Ganache not needed):
+
+```bash
+cd ~/rodeo-ros2/oracle/docker && docker compose --env-file .env.opsepolia up -d --force-recreate
+cd ~/rodeo-ros2/dao-bridge/org-web && docker compose --env-file .env.opsepolia up -d --force-recreate
+cd ~/rodeo-ros2/dao-bridge/ros2-eth-bridge/docker
+DAO_CONFIG=dao.opsepolia.yaml WALLET_PATH=~/.ros_eth/wallet_opsepolia.json ETH_POLL_INTERVAL_SEC=5 \
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --force-recreate
+cd ~/rodeo-ros2/quick-start/docker
+RODEO_WALLET=0xF31E405a68CAa3f021027395d7A7D2F6987d917f \
+ROS_DOMAIN_ID=41 ROBOT_NAMESPACE=panther RMW_IMPLEMENTATION=rmw_cyclonedds_cpp docker compose up -d --no-deps --force-recreate agent
+```
+
+Check: the bridge logs `chain 11155420`; the agent registers its service (first
+time on the new contracts); org-web's catalog lists it with the 15 min limit and
+the org-web log says `task timer: limits {'Logistics': 900}`. Deposit IEC into the
+Organization (org-web, organization box) before posting tasks from it. Back to
+Ganache: the same commands without `--env-file`, `DAO_CONFIG`, `WALLET_PATH`,
+`ETH_POLL_INTERVAL_SEC` and `RODEO_WALLET`.
 
 ## Quick Update Script
 
-For convenience, here's a one-liner to update all three components after deployment:
+`scripts/update-addresses.sh` updates the oracle, org-web and bridge configs in
+one go (it installs `jq` if missing):
 
 ```bash
-# Get the new addresses
-NEW_ORG=$(jq -r '.contracts.Organization' blockchain-network/smart-contracts/deployments/1337.json)
-NEW_TM=$(jq -r '.contracts.TaskManager' blockchain-network/smart-contracts/deployments/1337.json)
-NEW_SM=$(jq -r '.contracts.ServiceManager' blockchain-network/smart-contracts/deployments/1337.json)
-NEW_IEC=$(jq -r '.contracts.IECoin' blockchain-network/smart-contracts/deployments/1337.json)
+./scripts/update-addresses.sh blockchain-network/smart-contracts/deployments/1337.json
+```
 
-# Update oracle .env
-sed -i "s/ORGANIZATION_ADDRESS=.*/ORGANIZATION_ADDRESS=$NEW_ORG/" oracle/docker/.env
-sed -i "s/TASK_MANAGER_ADDRESS=.*/TASK_MANAGER_ADDRESS=$NEW_TM/" oracle/docker/.env
-sed -i "s/SERVICE_MANAGER_ADDRESS=.*/SERVICE_MANAGER_ADDRESS=$NEW_SM/" oracle/docker/.env
-sed -i "s/IECOIN_ADDRESS=.*/IECOIN_ADDRESS=$NEW_IEC/" oracle/docker/.env
+Then restart the containers:
 
-# Update org-web .env
-sed -i "s/ORGANIZATION_ADDRESS=.*/ORGANIZATION_ADDRESS=$NEW_ORG/" dao-bridge/org-web/.env
-sed -i "s/TASK_MANAGER_ADDRESS=.*/TASK_MANAGER_ADDRESS=$NEW_TM/" dao-bridge/org-web/.env
-sed -i "s/SERVICE_MANAGER_ADDRESS=.*/SERVICE_MANAGER_ADDRESS=$NEW_SM/" dao-bridge/org-web/.env
-sed -i "s/IECOIN_ADDRESS=.*/IECOIN_ADDRESS=$NEW_IEC/" dao-bridge/org-web/.env
-
-# Update ros-eth-bridge dao.yaml
-sed -i "s/Organization: .*/Organization: \"$NEW_ORG\"/" dao-bridge/ros-eth-bridge/docker/configs/dao.yaml
-sed -i "s/TaskManager: .*/TaskManager: \"$NEW_TM\"/" dao-bridge/ros-eth-bridge/docker/configs/dao.yaml
-sed -i "s/ServiceManager: .*/ServiceManager: \"$NEW_SM\"/" dao-bridge/ros-eth-bridge/docker/configs/dao.yaml
-sed -i "s/IECoin: .*/IECoin: \"$NEW_IEC\"/" dao-bridge/ros-eth-bridge/docker/configs/dao.yaml
-
-echo "✅ All configurations updated!"
-echo "Now restart the Docker containers:"
-echo "  cd oracle/docker && docker compose restart"
-echo "  cd dao-bridge/org-web && docker compose restart"
-echo "  cd dao-bridge/ros-eth-bridge/docker && docker compose restart"
+```bash
+cd oracle/docker && docker compose restart
+cd ../../dao-bridge/org-web && docker compose restart
+cd ../ros2-eth-bridge/docker && docker compose restart
 ```
 
 ## Configuration Priority
@@ -181,13 +206,13 @@ docker logs rodeo-oracle --tail 20
 
 ### Org-Web
 ```bash
-docker logs rodeo-org-web --tail 20
+docker logs org-web-console --tail 20
 # Look for: "✅ Configuration loaded via environment variables"
 ```
 
 ### ROS-Ethereum Bridge
 ```bash
-docker logs ros-eth-bridge --tail 50
+docker logs ros2-eth-bridge --tail 50
 # Look for: "dao_listener ready — chain 1337"
 # Look for: "dao_writer ready — chain 1337"
 ```
@@ -200,8 +225,8 @@ docker logs ros-eth-bridge --tail 50
 ```bash
 # Check what each service is using
 docker logs rodeo-oracle | grep -i address
-docker logs rodeo-org-web | grep -i address
-docker logs ros-eth-bridge | grep -i chain
+docker logs org-web-console | grep -i address
+docker logs ros2-eth-bridge | grep -i ready
 
 # Compare with deployment
 cat blockchain-network/smart-contracts/deployments/1337.json

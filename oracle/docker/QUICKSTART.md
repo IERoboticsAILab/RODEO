@@ -7,7 +7,7 @@ Before building, ensure you have:
 1. ✅ Docker and Docker Compose installed
 2. ✅ Blockchain running (Ganache at `http://localhost:8545` or update in `.env`)
 3. ✅ Contract addresses configured (see Configuration below)
-4. ✅ ABI files exist at `dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi/`
+4. ✅ ABI files exist at `dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi/`
 
 ## Configuration
 
@@ -56,7 +56,7 @@ Or manually:
 docker-compose build
 ```
 
-**Build time**: ~5-10 minutes (downloads ROS Noetic base image)
+**Build time**: about a minute
 
 ### Step 2: Start the Oracle
 
@@ -190,15 +190,12 @@ docker logs rodeo-oracle
 
 **Common issues:**
 
-1. **Port conflict**: Another service using port 11311 (ROS)
-   - Solution: Stop other ROS instances or change `ROS_MASTER_URI`
-
-2. **Missing ABI files**:
+1. **Missing ABI files**:
    ```
    Could not start watcher
    ```
    - Solution: Verify ABI path in docker-compose.yml
-   - Check: `ls ../../dao-bridge/ros-eth-bridge/catkin_ws/src/ros_eth_bridge/abi/`
+   - Check: `ls ../../dao-bridge/ros2-eth-bridge/ros2_ws/src/ros_eth_bridge/abi/`
 
 3. **Wrong RPC URL**:
    ```

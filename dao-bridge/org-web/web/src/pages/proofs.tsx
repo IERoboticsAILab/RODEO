@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { api } from "../lib/api";
 import { Task } from "../lib/types";
 import { formatUnitsString } from "../lib/units";
+import { describeTask } from "../lib/describe";
 
 export default function ProofsPage() {
   const { data: tasks, mutate } = useSWR<Task[]>("assignedTasks", api.tasks.assigned, { refreshInterval: 3000 });
@@ -69,7 +70,7 @@ export default function ProofsPage() {
                   return (
                     <tr key={t.id} className="border-t">
                       <td className="td">{t.id}</td>
-                      <td className="td">{t.description}</td>
+                      <td className="td">{describeTask(t.description)}</td>
                       <td className="td">{t.taskCategory}</td>
                       <td className="td">{t.taskType}</td>
                       <td className="td">{reward}</td>

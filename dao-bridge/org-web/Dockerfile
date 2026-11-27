@@ -1,9 +1,10 @@
+# Build context: the repo root (for robot-agent's rodeo_common).
 # build frontend
 FROM node:20 AS frontend_build
 WORKDIR /frontend
-COPY web/package*.json ./
+COPY dao-bridge/org-web/web/package*.json ./
 RUN npm ci
-COPY web/ .
+COPY dao-bridge/org-web/web/ .
 ARG NEXT_PUBLIC_API_BASE=/api
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 RUN npm run build
@@ -33,9 +34,12 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Backend
 WORKDIR /app
-COPY backend/requirements.txt /app/requirements.txt
+COPY dao-bridge/org-web/backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY backend/ /app/
+# RODEO conventions (service schemas, task descriptions), shared with robots and oracle
+COPY robot-agent/ros2_ws/src/rodeo_common /tmp/rodeo_common
+RUN pip install --no-cache-dir --no-deps /tmp/rodeo_common && rm -rf /tmp/rodeo_common
+COPY dao-bridge/org-web/backend/ /app/
 
 # Frontend runtime files
 WORKDIR /web
@@ -45,8 +49,8 @@ COPY --from=frontend_build /frontend/node_modules /web/node_modules
 COPY --from=frontend_build /frontend/next.config.js /web/
 
 # Nginx and Supervisor configs
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY dao-bridge/org-web/nginx.conf /etc/nginx/nginx.conf
+COPY dao-bridge/org-web/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -fsS http://127.0.0.1/ || exit 1

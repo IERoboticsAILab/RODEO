@@ -24,6 +24,7 @@ interface ITaskManager {
     function assignTaskExecutor(uint256 taskId, address executor, uint256 reward) external;
     function unassignTask(uint256 taskId) external;
     function setOracle(address _oracle) external;
+    function setCategoryTimeout(string calldata category, uint256 timeoutSeconds) external;
 }
 
 /// @dev Mock org that routes calls into TaskManager
@@ -74,6 +75,10 @@ contract MockOrganization is IOrganization, IServiceRegistrationReceiver {
         uint256 taskId
     ) external {
         ITaskManager(taskManagerAddress).unassignTask(taskId);
+    }
+
+    function callSetTimeout(address tm, string calldata category, uint256 s) external {
+        ITaskManager(tm).setCategoryTimeout(category, s);
     }
 
     function callSetOracle(address tm, address _oracle) external {

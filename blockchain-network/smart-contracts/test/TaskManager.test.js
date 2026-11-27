@@ -413,3 +413,67 @@ it("total count equals array length, which matches highest valid 1 based index",
 });
 
 });
+
+describe("TaskManager execution timeout", function () {
+  let token, orgStub, tm, creator, executor, oracle, anyone;
+  const LIMIT = 900;
+
+  beforeEach(async function () {
+    [, creator, executor, oracle, anyone] = await ethers.getSigners();
+    token = await (await ethers.getContractFactory("contracts/IECoin.sol:IECoin")).deploy(1000, creator.address);
+    orgStub = await (await ethers.getContractFactory("MockOrganization")).deploy();
+    tm = await (await ethers.getContractFactory("contracts/TaskManager.sol:TaskManager"))
+      .deploy(await token.getAddress(), await orgStub.getAddress());
+    await token.connect(creator).approve(await tm.getAddress(), 500);
+    await orgStub.callSetOracle(await tm.getAddress(), oracle.address);
+    await orgStub.callSetTimeout(await tm.getAddress(), "Logistics", LIMIT);
+    await tm.connect(creator).registerTask("T", "Logistics", "ItemTransport", 100);
+    await orgStub.callAssign(await tm.getAddress(), 1, executor.address, 100);
+  });
+
+  const later = async (s) => { await ethers.provider.send("evm_increaseTime", [s]); await ethers.provider.send("evm_mine", []); };
+
+  it("only the organization sets timeouts", async () => {
+    await expect(tm.connect(anyone).setCategoryTimeout("Logistics", 1)).to.be.revertedWith("Only org");
+  });
+
+  it("sets a deadline at assignment and does not expire before it", async () => {
+    const a = await tm.assignedAt(1);
+    expect(await tm.deadlineOf(1)).to.equal(a + BigInt(LIMIT));
+    await later(LIMIT - 5);
+    expect(await tm.isExpired(1)).to.equal(false);
+    await expect(tm.connect(anyone).expireTask(1)).to.be.revertedWith("Task not expired");
+  });
+
+  it("anyone expires it after the deadline: unassigned, refunded, inactive", async () => {
+    await later(LIMIT + 1);
+    const before = await token.balanceOf(creator.address);
+    await expect(tm.connect(anyone).expireTask(1)).to.emit(tm, "TaskExpired").and.to.emit(tm, "TaskUnassigned");
+    const t = await tm.getTask(1);
+    expect(t.status).to.equal(0);
+    expect(t.active).to.equal(false);
+    expect(await token.balanceOf(creator.address)).to.equal(before + 100n);
+    expect(await tm.deadlineOf(1)).to.equal(0);
+  });
+
+  it("refuses a proof after the deadline", async () => {
+    await later(LIMIT + 1);
+    await expect(tm.connect(executor).submitProof(1, "file://p")).to.be.revertedWith("Task timed out");
+  });
+
+  it("a proof in time cannot be expired while the oracle checks it, and can still be paid", async () => {
+    await tm.connect(executor).submitProof(1, "file://p");
+    await later(LIMIT + 60);
+    expect(await tm.isExpired(1)).to.equal(false);
+    await expect(tm.connect(anyone).expireTask(1)).to.be.revertedWith("Task not expired");
+    await expect(tm.connect(oracle).oracleFulfill(1, true, "")).to.emit(tm, "TaskRewardPaid");
+  });
+
+  it("other categories have no limit", async () => {
+    await tm.connect(creator).registerTask("U", "Energy", "Charging", 100);
+    await orgStub.callAssign(await tm.getAddress(), 2, executor.address, 100);
+    expect(await tm.deadlineOf(2)).to.equal(0);
+    await later(100000);
+    expect(await tm.isExpired(2)).to.equal(false);
+  });
+});

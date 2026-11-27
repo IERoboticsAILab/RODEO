@@ -1,0 +1,44 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: mcap
+  duration:
+    nanoseconds: 80913784095
+  starting_time:
+    nanoseconds_since_epoch: 1795714770346133252
+  message_count: 179
+  topics_with_message_count:
+    - topic_metadata:
+        name: /rodeo/payload_weight
+        type: rodeo_interfaces/msg/PayloadWeight
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 6
+    - topic_metadata:
+        name: /rodeo/pose
+        type: geometry_msgs/msg/PoseStamped
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 165
+    - topic_metadata:
+        name: /rodeo/events
+        type: rodeo_interfaces/msg/TaskEvent
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 7
+    - topic_metadata:
+        name: /rodeo/manifest
+        type: rodeo_interfaces/msg/ProofManifest
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 1
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - task1_panther_20261126T173930_0.mcap
+  files:
+    - path: task1_panther_20261126T173930_0.mcap
+      starting_time:
+        nanoseconds_since_epoch: 1795714770346133252
+      duration:
+        nanoseconds: 80913784095
+      message_count: 179
